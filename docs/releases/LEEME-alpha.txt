@@ -1,0 +1,50 @@
+Nimbo 0.4.0-alpha.1
+Catálogo, ventas, compras, inventario, gastos y documentos para emprendedores.
+
+Esta es una versión alpha para evaluación. Prueba primero con datos ficticios.
+
+Linux Debian 13, Intel/AMD 64 bits:
+Da permiso de ejecución al archivo AppImage y ábrelo.
+Si no puede montarse: ./Nimbo-0.4.0-alpha.1-linux-x86_64.AppImage --appimage-extract-and-run
+
+Windows 11, Intel/AMD 64 bits:
+Extrae TODO el ZIP en una carpeta y abre Nimbo.exe. Conserva _internal junto al
+programa: no basta con copiar solamente el EXE. No requiere instalar Python.
+La alpha no incluye firma digital; verifica su procedencia antes de abrirla.
+
+DATOS
+Cada usuario tiene su base local. No se incluyen datos comerciales del creador.
+Linux: ~/.local/share/Fandres/MiNegocio/catalog.sqlite3 (salvo XDG_DATA_HOME).
+Windows: carpeta de datos de usuario que Qt asigna a Fandres/MiNegocio.
+El nombre interno MiNegocio se conserva para mantener las bases anteriores.
+Cierra Nimbo antes de copiar la carpeta de datos para respaldarla.
+Reemplazar el ejecutable no debe borrar esta carpeta. No abras dos versiones a la vez.
+
+PRUEBAS SUGERIDAS
+1. Crear producto y verificar que su código conserva ceros iniciales.
+2. Registrar una venta en efectivo y otra con cobro pendiente.
+3. Añadir envío, guía, ciudad y datos opcionales del cliente.
+4. Cerrar/reabrir y comprobar que los datos siguen allí.
+5. Completar un cobro y el pago de un envío desde el detalle.
+6. Filtrar ventas con retención. Anular una venta de prueba y consultar su historial.
+7. Revisar formularios con la escala de pantalla habitual.
+
+ALCANCE
+Incluye catálogo, ventas, cobros, compras con costos por modelo, recepción,
+inventario, gastos, préstamos, control opcional de tarjetas y configuración.
+Los documentos PDF, PNG y JPG se adjuntan a registros guardados desde el clip.
+Se guardan copias por año/mes en Documentos, junto a la base de datos.
+Respalda la base Y la carpeta Documentos. XML de ventas pendiente.
+El neto tras comisión/envío no es utilidad.
+No emite ni modifica facturas en plataformas externas. Puedes corregir productos, cantidades y precios de ventas guardadas. Anular conserva
+el historial; eliminar definitivamente requiere habilitarlo en Configuración y confirmar.
+
+COMENTARIOS
+Indica versión de Nimbo, sistema operativo, escala de pantalla, pasos, resultado
+esperado y resultado observado. Si adjuntas capturas, oculta datos personales.
+
+LICENCIAS
+Código de Nimbo: MIT, copyright (c) 2026 fandres323.
+Usa Qt/PySide6/Shiboken bajo LGPLv3. Consulte LICENSE-Nimbo-MIT.txt,
+THIRD-PARTY-NOTICES.txt, REEMPLAZAR-BIBLIOTECAS.txt y third-party-licenses/.
+Conserve el archivo de fuentes de esta versión junto a los paquetes.

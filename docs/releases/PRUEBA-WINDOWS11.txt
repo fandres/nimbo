@@ -1,0 +1,38 @@
+PRUEBA DE NIMBO ALPHA EN WINDOWS 11 (Intel/AMD 64 bits)
+
+1. Copia Nimbo-0.4.0-alpha.1-windows-x86_64.zip al equipo.
+2. Clic derecho > Extraer todo. Abre la carpeta extraída Nimbo.
+3. Abre Nimbo.exe. No lo ejecutes directamente dentro del ZIP.
+4. Conserva la carpeta _internal al lado del EXE. No necesitas instalar Python
+   ni Qt. Puedes crear un acceso directo al EXE en el escritorio.
+5. Usa datos ficticios durante la evaluación.
+
+Esta alpha no está firmada digitalmente. Si Windows muestra una advertencia,
+comprueba que el archivo es el compartido por el desarrollador. No desactives
+el antivirus. Si lo bloquea, envía el texto de la advertencia para revisarlo.
+
+Prueba breve:
+- Crear un producto con código 001, marca y subtipo.
+- Registrar una venta en efectivo con nombre del cliente.
+- Registrar otra venta pendiente por tarjeta y con envío.
+- Añadir ciudad, guía, factura y retención informativa.
+- Cerrar y reabrir Nimbo: comprobar que los datos siguen allí.
+- Completar cobro y pago del envío desde el detalle, guardando los cambios.
+- Anular una venta de prueba y encontrarla en el filtro Anuladas.
+- Adjuntar un PDF o PNG de prueba desde el clip de un gasto, compra o venta
+  guardado; abrir la copia, cerrar/reabrir y comprobar que sigue disponible.
+- Revisar ventanas con la escala habitual (100 %, 125 %, 150 %): los botones
+  para guardar y los campos deben ser accesibles.
+
+DATOS Y RESPALDO
+Cada equipo tiene su propia base; no se sincroniza con Linux.
+La ubicación habitual es %APPDATA%\Fandres\MiNegocio\catalog.sqlite3.
+Puedes pegar %APPDATA%\Fandres\MiNegocio en la barra del Explorador.
+Para respaldar, cierra Nimbo y copia toda esa carpeta a un lugar seguro,
+incluida Documentos con las copias de los adjuntos.
+No borres esa carpeta al sustituir la aplicación por una versión nueva.
+
+COMENTARIOS
+Indica versión de Nimbo, versión de Windows, escala de pantalla, qué hiciste,
+qué esperabas y qué ocurrió. Adjunta capturas sin datos personales si ayuda.
+La comprobación con Wine no sustituye esta prueba en Windows 11 real.

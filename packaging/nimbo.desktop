@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Nimbo
+Comment=Catálogo, ventas y cobros · Alpha
+Exec=Nimbo
+Icon=nimbo
+Terminal=false
+Categories=Office;Finance;

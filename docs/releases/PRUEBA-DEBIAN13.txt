@@ -1,0 +1,29 @@
+PRUEBA DE NIMBO ALPHA EN DEBIAN 13 (Intel/AMD 64 bits)
+
+1. Copia el AppImage a una carpeta de tu equipo, por ejemplo Documentos/Nimbo.
+2. En Propiedades > Permisos, permite ejecutarlo como programa.
+3. Ábrelo con doble clic. No necesitas instalar Python ni Qt.
+4. Usa datos ficticios para esta primera revisión.
+
+Prueba breve:
+- Crear un producto con código 001.
+- Registrar una venta en efectivo.
+- Registrar otra venta con cobro pendiente y envío.
+- Cerrar Nimbo y abrirlo de nuevo: los datos deben conservarse.
+- Completar el cobro y el pago del envío desde el detalle.
+- Revisar que los campos y Guardar cambios se vean con la escala de tu pantalla.
+- Anular una venta de prueba y encontrarla con el filtro Anuladas.
+
+Si el archivo no abre, ejecútalo desde su carpeta para ver el error:
+./Nimbo-0.2.0-alpha.1-linux-x86_64.AppImage
+
+Si el error menciona FUSE, prueba:
+./Nimbo-0.2.0-alpha.1-linux-x86_64.AppImage --appimage-extract-and-run
+
+Comparte el mensaje exacto y, si es un problema visual, una captura sin datos
+personales. Anota si usas GNOME/KDE y la escala de pantalla (100 %, 125 %, 150 %).
+
+Cada equipo guarda su propia información. Este archivo no lleva tus ventas ni
+sincroniza datos entre equipos. La base se guarda fuera del AppImage; reemplazar
+el programa no debe borrarla. Para un respaldo manual, cierra Nimbo y copia la
+carpeta ~/.local/share/Fandres/MiNegocio (si no modificaste XDG_DATA_HOME).

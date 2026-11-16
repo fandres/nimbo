@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+*.sqlite*
+*.db
+*.db-*
+build/
+dist/
+.superpowers/
+comprobantes/
+.venv-build/

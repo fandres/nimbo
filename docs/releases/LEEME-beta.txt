@@ -1,0 +1,73 @@
+Nimbo 0.5.0-beta.1
+Catálogo, ventas, compras, inventario, gastos y documentos para emprendedores.
+
+Esta es una primera versión beta para evaluación. Prueba primero con datos ficticios.
+
+Linux Debian 13, Intel/AMD 64 bits:
+Da permiso de ejecución al archivo AppImage y ábrelo.
+Si no puede montarse: ./Nimbo-0.5.0-beta.1-linux-x86_64.AppImage --appimage-extract-and-run
+
+Windows 11, Intel/AMD 64 bits:
+Extrae TODO el ZIP en una carpeta y abre Nimbo.exe. Conserva _internal junto al
+programa: no basta con copiar solamente el EXE. No requiere instalar Python.
+La beta no incluye firma digital; verifica su procedencia antes de abrirla.
+
+DATOS
+Cada usuario tiene su base local. No se incluyen datos comerciales del creador.
+Linux: ~/.local/share/Fandres/MiNegocio/catalog.sqlite3 (salvo XDG_DATA_HOME).
+Windows: carpeta de datos de usuario que Qt asigna a Fandres/MiNegocio.
+El nombre interno MiNegocio se conserva para mantener las bases anteriores.
+Cierra Nimbo antes de copiar la carpeta de datos para respaldarla.
+Reemplazar el ejecutable no debe borrar esta carpeta. No abras dos versiones a la vez.
+
+PRUEBAS SUGERIDAS
+1. Crear producto y verificar que su código conserva ceros iniciales.
+2. Registrar una venta en efectivo y otra con cobro pendiente.
+3. Añadir envío, guía, ciudad y datos opcionales del cliente.
+4. Cerrar/reabrir y comprobar que los datos siguen allí.
+5. Completar un cobro y el pago de un envío desde el detalle.
+6. Filtrar ventas con retención. Anular una venta de prueba y consultar su historial.
+7. Revisar formularios con la escala de pantalla habitual.
+
+ALCANCE
+Incluye catálogo, ventas, cobros, compras con costos por modelo, recepción,
+inventario, gastos, préstamos, control opcional de tarjetas y configuración.
+Los documentos PDF, PNG y JPG se adjuntan a registros guardados desde el clip.
+Se guardan copias por año/mes en Documentos, junto a la base de datos.
+Respalda la base Y la carpeta Documentos. XML de ventas pendiente.
+El neto tras comisión/envío no es utilidad.
+No emite ni modifica facturas en plataformas externas. Puedes corregir productos, cantidades y precios de ventas guardadas. Anular conserva
+el historial; eliminar definitivamente requiere habilitarlo en Configuración y confirmar.
+
+COMENTARIOS
+Indica versión de Nimbo, sistema operativo, escala de pantalla, pasos, resultado
+esperado y resultado observado. Si adjuntas capturas, oculta datos personales.
+
+LICENCIAS
+Código de Nimbo: MIT, copyright (c) 2026 fandres323.
+Usa Qt/PySide6/Shiboken bajo LGPLv3. Consulte LICENSE-Nimbo-MIT.txt,
+THIRD-PARTY-NOTICES.txt, REEMPLAZAR-BIBLIOTECAS.txt y third-party-licenses/.
+Conserve el archivo de fuentes de esta versión junto a los paquetes.
+
+NOVEDADES DE BETA 1
+Informes PDF de ventas, gastos, dinero y rentabilidad FIFO; respaldos completos
+con restauración; reglas de costos por subtipo y producto; reparto automático de
+costos en pedidos de un mismo modelo; acciones de Inicio con colores y resaltado.
+
+ANTES DE ACTUALIZAR
+Cierra la versión anterior y conserva una copia completa de la carpeta de datos,
+incluida Documentos. El esquema 24 de alfa 0.4 se actualiza a 25 con copia previa
+de SQLite. No vuelvas a abrir la alfa sobre la base migrada.
+
+ALCANCE Y LIMITACIONES
+FIFO usa unidades recibidas y registradas en el inventario. Existencias iniciales
+físicas, ajustes sin compra y servicios sin costo no se valoran como cero; el
+informe los identifica como sin costo trazable. Costos pendientes son provisionales.
+No incluye contraseña de acceso, códigos de barras ni lectura automática de XML.
+El resultado es de gestión; no sustituye la liquidación fiscal.
+
+VALIDACIÓN RECOMENDADA
+Prueba compra, recepción, venta, edición, anulación, informe PDF y restauración
+con datos ficticios. Comprueba escala y legibilidad en tu equipo. Windows se
+construye con herramientas Windows bajo Wine; la validación en Windows 11 real
+sigue pendiente. Linux objetivo: Debian 13 x86-64; no se certifica Debian 12.

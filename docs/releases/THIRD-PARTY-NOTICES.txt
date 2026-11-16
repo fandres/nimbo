@@ -1,0 +1,50 @@
+Nimbo 0.5.0-beta.1 — avisos de terceros
+
+El código propio de Nimbo se distribuye bajo MIT, copyright (c) 2026 fandres323.
+MIT no sustituye las licencias de las bibliotecas, los complementos ni las
+herramientas incorporadas. Consulte LICENSE-Nimbo-MIT.txt.
+
+Qt 6.12.0, PySide6 6.12.0 y Shiboken6 6.12.0
+Copyright The Qt Company Ltd. y los respectivos colaboradores.
+Se utilizan bajo GNU LGPL versión 3, junto a los avisos y excepciones aplicables
+a cada archivo. Los componentes de terceros internos conservan sus licencias.
+Se adjuntan LGPLv3 y GPLv3 (la LGPLv3 complementa la GPLv3), además de avisos
+recogidos de los paquetes y fuentes oficiales. No se concede una licencia
+comercial de Qt. Nimbo no está afiliado ni avalado por The Qt Company.
+https://doc.qt.io/qtforpython-6/
+https://doc.qt.io/qt-6/licensing.html
+
+Las bibliotecas se distribuyen como bibliotecas compartidas. Puede reemplazarlas
+por versiones modificadas compatibles y realizar ingeniería inversa para depurar
+esas modificaciones; Nimbo no impone restricciones adicionales a esos derechos.
+Consulte REEMPLAZAR-BIBLIOTECAS.txt.
+
+FUENTES
+La entrega se acompaña de Nimbo-0.5.0-beta.1-sources.zip, con el código de Nimbo,
+fuentes de Qt/PySide6 y las fuentes/avisos adicionales identificados en la
+construcción. Conserve y facilite ese archivo junto a los binarios al redistribuir.
+Su contenido incluye las instrucciones y el inventario con versiones y SHA-256.
+Las fuentes oficiales de Qt están en:
+https://download.qt.io/official_releases/qt/6.12/6.12.0/submodules/
+https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.12.0-src/
+
+Python 3.13.5
+Python Software Foundation y colaboradores. Licencia PSF y avisos incorporados.
+https://docs.python.org/3/license.html
+
+SQLite
+El núcleo de SQLite está dedicado al dominio público. Se incluye a través del
+módulo sqlite3 de Python; los avisos de Python siguen siendo aplicables.
+https://www.sqlite.org/copyright.html
+
+PyInstaller 6.22.3
+GPL con excepción del bootloader; ciertos archivos tienen licencia Apache 2.0.
+La excepción permite distribuir el programa empaquetado bajo su propia licencia,
+respetando las de las dependencias. https://pyinstaller.org/en/stable/license.html
+
+Linux: el runtime AppImage y las bibliotecas de sistema incluidas conservan sus
+propias licencias. Windows: las bibliotecas del runtime Microsoft y demás DLL
+incluidas conservan sus avisos y condiciones de redistribución.
+
+Los textos detallados se encuentran en third-party-licenses/; el manifiesto
+JSON junto al paquete registra las herramientas utilizadas y la validación.
