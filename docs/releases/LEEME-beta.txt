@@ -1,11 +1,11 @@
-Nimbo 0.5.0-beta.1
+Nimbo 0.6.0-beta.2
 Catálogo, ventas, compras, inventario, gastos y documentos para emprendedores.
 
-Esta es una primera versión beta para evaluación. Prueba primero con datos ficticios.
+Esta es una segunda versión beta para evaluación. Prueba primero con datos ficticios.
 
 Linux Debian 13, Intel/AMD 64 bits:
 Da permiso de ejecución al archivo AppImage y ábrelo.
-Si no puede montarse: ./Nimbo-0.5.0-beta.1-linux-x86_64.AppImage --appimage-extract-and-run
+Si no puede montarse: ./Nimbo-0.6.0-beta.2-linux-x86_64.AppImage --appimage-extract-and-run
 
 Windows 11, Intel/AMD 64 bits:
 Extrae TODO el ZIP en una carpeta y abre Nimbo.exe. Conserva _internal junto al
@@ -32,9 +32,9 @@ PRUEBAS SUGERIDAS
 ALCANCE
 Incluye catálogo, ventas, cobros, compras con costos por modelo, recepción,
 inventario, gastos, préstamos, control opcional de tarjetas y configuración.
-Los documentos PDF, PNG y JPG se adjuntan a registros guardados desde el clip.
+Los documentos PDF, XML, PNG y JPG se adjuntan a registros guardados desde el clip.
 Se guardan copias por año/mes en Documentos, junto a la base de datos.
-Respalda la base Y la carpeta Documentos. XML de ventas pendiente.
+Respalda la base Y la carpeta Documentos. El XML se conserva; no se interpreta automáticamente.
 El neto tras comisión/envío no es utilidad.
 No emite ni modifica facturas en plataformas externas. Puedes corregir productos, cantidades y precios de ventas guardadas. Anular conserva
 el historial; eliminar definitivamente requiere habilitarlo en Configuración y confirmar.
@@ -44,20 +44,22 @@ Indica versión de Nimbo, sistema operativo, escala de pantalla, pasos, resultad
 esperado y resultado observado. Si adjuntas capturas, oculta datos personales.
 
 LICENCIAS
-Código de Nimbo: MIT, copyright (c) 2026 fandres323.
+Código de Nimbo: MIT, copyright (c) 2026 fandres.
 Usa Qt/PySide6/Shiboken bajo LGPLv3. Consulte LICENSE-Nimbo-MIT.txt,
 THIRD-PARTY-NOTICES.txt, REEMPLAZAR-BIBLIOTECAS.txt y third-party-licenses/.
 Conserve el archivo de fuentes de esta versión junto a los paquetes.
 
-NOVEDADES DE BETA 1
-Informes PDF de ventas, gastos, dinero y rentabilidad FIFO; respaldos completos
-con restauración; reglas de costos por subtipo y producto; reparto automático de
-costos en pedidos de un mismo modelo; acciones de Inicio con colores y resaltado.
+NOVEDADES DE BETA 2
+Nuevo logo de Nimbo. Informes con períodos rápidos y filtros compactos.
+IVA de compras separado en base, impuesto y total; informe de compras.
+Seguimiento anual de certificados de retención por cliente, con notas, historial
+y soportes PDF/imágenes. Copias de XML de ventas. Estados de costos sin pendiente
+preseleccionado y formulario de producto comprado renovado.
 
 ANTES DE ACTUALIZAR
-Cierra la versión anterior y conserva una copia completa de la carpeta de datos,
-incluida Documentos. El esquema 24 de alfa 0.4 se actualiza a 25 con copia previa
-de SQLite. No vuelvas a abrir la alfa sobre la base migrada.
+Cierra la versión anterior y guarda un respaldo completo con Documentos.
+El esquema 25 de beta 1 se actualiza a 29 con copia previa de SQLite.
+No abras versiones anteriores sobre la base migrada. Prueba primero en una copia.
 
 ALCANCE Y LIMITACIONES
 FIFO usa unidades recibidas y registradas en el inventario. Existencias iniciales
@@ -71,3 +73,8 @@ Prueba compra, recepción, venta, edición, anulación, informe PDF y restauraci
 con datos ficticios. Comprueba escala y legibilidad en tu equipo. Windows se
 construye con herramientas Windows bajo Wine; la validación en Windows 11 real
 sigue pendiente. Linux objetivo: Debian 13 x86-64; no se certifica Debian 12.
+
+ACTUALIZACIÓN DEL 20 DE NOVIEMBRE
+Inicio con indicadores, comparación mensual, gráfica y accesos a pendientes.
+Ingreso rápido de ventas y gastos; cobros con fecha, cuenta y forma de pago.
+Saldos iniciales pendientes destacados y configuración con doble clic en la cuenta.

@@ -126,7 +126,7 @@ def test_schema_12_backup_and_inventory_preserved(tmp_path):
         c=CatalogRepository(path);c.connection.execute("UPDATE inventory_state SET revision=17");c.connection.commit();c.close()
     finally:database.migrate_expenses=original;database.migrate_money=original_money
     c=CatalogRepository(path)
-    assert c.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert c.connection.execute('PRAGMA user_version').fetchone()[0]==29
     assert c.connection.execute('SELECT revision FROM inventory_state').fetchone()[0]==17
     assert c.connection.execute('PRAGMA foreign_key_check').fetchall()==[]
     c.close()

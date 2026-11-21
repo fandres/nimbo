@@ -170,3 +170,12 @@ for action, soft, hover, pressed in [
 {selector}:enabled:hover, {selector}:enabled:focus {{ background: {hover}; border-color: {color}; }}
 {selector}:enabled:pressed {{ background: {pressed}; border-color: {color}; }}
 """
+
+STYLE += '''
+QPushButton#homeMetric { background:white; border:1px solid #e3e8f0; border-radius:16px; padding:0; text-align:left; }
+QPushButton#homeMetric:hover, QPushButton#homeMetric:focus {background:#f4f7ff;border-color:#9eb4e8;}
+QPushButton#homeMetric QLabel, QPushButton#homeRecent QLabel {border:none;background:transparent;}
+QPushButton#homeRecent {background:white;border:0;border-bottom:1px solid #e8edf5;border-radius:0;padding:0;text-align:left;}
+QPushButton#homeRecent:hover, QPushButton#homeRecent:focus {background:#edf2ff;}
+QFrame#homeAttention {border:0;border-bottom:1px solid #e8edf5;}
+'''

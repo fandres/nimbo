@@ -31,6 +31,8 @@ class PurchaseReceiptDialog(QDialog):
         warning_layout.addWidget(note('Puedes recibir la maquinaria. Recuerda completar los costos de este pedido.'))
         from ..purchases import categories_for
         details=', '.join(categories_for(draft_from_record(self.record))[key] for key in progress['pending_categories'])
+        unselected=', '.join(categories_for(draft_from_record(self.record))[key] for key in progress['unselected_categories'])
+        if unselected:details+=(' · ' if details else '')+'Sin seleccionar: '+unselected
         if not details:details='Revisar costos pendientes' if progress['legacy'] else 'Falta distribuir gastos entre las máquinas'
         warning_layout.addWidget(note(details));root.addWidget(self.warning)
         self.warning.setVisible(progress['state']!='complete')

@@ -1,7 +1,7 @@
 """Seguimiento explícito de costos, independiente de pagos y recepción."""
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget, QGridLayout, QComboBox, QCheckBox
-from ..purchases import CATEGORIES
+from ..purchases import CATEGORIES, COST_STATES, cost_states_complete
 from .sales_widgets import note
 
 
@@ -19,7 +19,7 @@ class PurchaseProgressEditor(QWidget):
         self.categories=dict(CATEGORIES if categories is None else categories)
         for i,(key,label) in enumerate(self.categories.items()):
             title=note(label); combo=QComboBox()
-            for text,value in [('Pendiente','pending'),('Registrado','recorded'),('No aplica','not_applicable')]: combo.addItem(text,value)
+            for text,value in COST_STATES: combo.addItem(text,value)
             layout.addWidget(title,1+i//2*2,i%2*2,1,2); layout.addWidget(combo,2+i//2*2,i%2*2,1,2)
             self.editors[key]=combo; self.labels.append(title); combo.currentIndexChanged.connect(self.changed)
         self.activate.toggled.connect(self._toggle); self.legacy.currentIndexChanged.connect(self.changed)
@@ -34,7 +34,7 @@ class PurchaseProgressEditor(QWidget):
 
     def set_states(self,states,legacy_complete=False):
         self.legacy.setCurrentIndex(int(legacy_complete))
-        for key,combo in self.editors.items(): combo.setCurrentIndex(combo.findData(states.get(key,'pending') if states else 'pending'))
+        for key,combo in self.editors.items(): combo.setCurrentIndex(combo.findData(states.get(key,'unselected') if states else 'unselected'))
         self.activate.setChecked(states is not None)
         self.activate.setEnabled(states is None)
         self._toggle()
@@ -44,4 +44,4 @@ class PurchaseProgressEditor(QWidget):
 
     def is_complete(self):
         states=self.states()
-        return all(v!='pending' for v in states.values()) if states is not None else bool(self.legacy.currentData())
+        return cost_states_complete(states) if states is not None else bool(self.legacy.currentData())

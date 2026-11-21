@@ -112,7 +112,7 @@ def test_migration_24_keeps_orders_and_creates_backup(tmp_path):
     for scope in ('product','subtype'):c.connection.execute('DROP TABLE purchase_cost_rules_'+scope)
     c.connection.execute('PRAGMA user_version=24');c.connection.commit();c.close()
     c=CatalogRepository(tmp_path/'db')
-    assert c.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert c.connection.execute('PRAGMA user_version').fetchone()[0]==29
     assert PurchasesRepository(c.connection).get(row['id'])['total_cents']==10000
     assert PurchaseCostRules(c.connection).selection('product',p.id) is None
     assert not c.connection.execute('PRAGMA foreign_key_check').fetchall()

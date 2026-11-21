@@ -1,7 +1,7 @@
 """Asignaciones manuales COP y seguimiento de conceptos, sin inventario."""
-from .purchases import line_original_total, line_vat_cop
+from .purchases import line_original_total, line_vat_cop, line_base_cop, apply_invoice_vat
 from decimal import Decimal, localcontext
-from .purchases import CATEGORIES, convert_to_cop, categories_for
+from .purchases import CATEGORIES, convert_to_cop, categories_for, cost_states_complete
 
 ALLOCATION_FIELDS = dict(zip(CATEGORIES, ('shipping_allocated_cents', 'importation_allocated_cents',
                                          'taxes_allocated_cents', 'other_allocated_cents')))
@@ -16,7 +16,7 @@ def allocation_summary(draft):
 
 
 def line_unit_costs(line):
-    base=convert_to_cop(line_original_total(line),line.currency,line.exchange_rate)
+    base=line_base_cop(line)
     total=base+line_vat_cop(line)+sum(getattr(line,field) for field in ALLOCATION_FIELDS.values())+sum(line.extra_allocations.values())
     with localcontext() as context:
         context.prec=60
@@ -26,10 +26,11 @@ def line_unit_costs(line):
 
 def purchase_progress(draft, cancelled=False):
     pending=[key for key in categories_for(draft) if draft.cost_states and draft.cost_states[key]=='pending']
-    complete=draft.costs_complete if draft.cost_states is None else not pending
+    unselected=[key for key in categories_for(draft) if draft.cost_states and draft.cost_states[key]=='unselected']
+    complete=draft.costs_complete if draft.cost_states is None else cost_states_complete(draft.cost_states)
     state=('cancelled' if cancelled else 'costs_pending' if not complete else
            'complete' if allocation_summary(draft)['complete'] else 'allocation_pending')
-    return dict(state=state,pending_categories=pending,legacy=draft.cost_states is None)
+    return dict(state=state,pending_categories=pending,unselected_categories=unselected,legacy=draft.cost_states is None)
 
 
 def automatic_allocations(draft):

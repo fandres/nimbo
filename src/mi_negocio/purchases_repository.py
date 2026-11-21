@@ -1,5 +1,5 @@
 """Pedidos y costos; escritura atómica e historial anterior a cada corrección."""
-from .purchases import line_original_total, line_vat_cop
+from .purchases import line_original_total, line_vat_cop, line_base_cop, apply_invoice_vat
 from dataclasses import asdict
 from datetime import datetime, timezone, date
 from decimal import Decimal
@@ -72,7 +72,7 @@ class PurchasesRepository:
             values = (line.product_id, code, name, line.quantity, line.unit_cost_cents, line.currency,
                       str(line.exchange_rate) if line.exchange_rate is not None else None,
                       line.converted_on.isoformat() if line.converted_on else None,
-                      convert_to_cop(line_original_total(line), line.currency, line.exchange_rate))
+                      line_base_cop(line))
             if historical:
                 self.connection.execute('''UPDATE purchase_lines SET product_id=?,code=?,name=?,quantity=?,unit_cost_cents=?,
                     currency=?,exchange_rate=?,converted_on=?,subtotal_cents=? WHERE id=?''', (*values, line.line_id))
@@ -88,6 +88,8 @@ class PurchasesRepository:
                 (*[getattr(line,field) for field in ALLOCATION_FIELDS.values()], target_id))
         for key in old.keys() - retained:
             self.connection.execute('DELETE FROM purchase_lines WHERE id=?', (key,))
+        self.connection.execute('UPDATE purchases SET invoice_vat_enabled=?,invoice_vat_rate=? WHERE id=?',
+                                (int(draft.invoice_vat_enabled),str(draft.invoice_vat_rate),purchase_id))
         self.connection.execute('UPDATE purchases SET supplier_alias=?,tracking_number=? WHERE id=?',(draft.supplier_alias.strip(),draft.tracking_number.strip(),purchase_id))
         self.connection.execute('UPDATE purchases SET cost_definitions_json=? WHERE id=?',(serialized(definitions_for(draft)),purchase_id))
         self.connection.execute('UPDATE purchases SET cost_states_json=? WHERE id=?',
@@ -111,7 +113,7 @@ class PurchasesRepository:
                 if normalized_payload(existing['request_payload']) != normalized_payload(payload):
                     raise StorageError('Esta solicitud ya se guardó con otros datos. Abre la compra para corregirla.')
                 return self._get(existing['id'])
-            draft = automatic_allocations(draft)
+            draft = automatic_allocations(apply_invoice_vat(draft))
             calculate_purchase_totals(draft)
             timestamp = now()
             cursor = self.connection.execute('''INSERT INTO purchases(request_id,request_payload,purchased_on,supplier,reference,
@@ -137,7 +139,7 @@ class PurchasesRepository:
     def update(self, purchase_id, draft, *, expected_revision):
         with operation(self.connection):
             previous = self._editable(purchase_id, expected_revision)
-            draft = automatic_allocations(draft)
+            draft = automatic_allocations(apply_invoice_vat(draft))
             calculate_purchase_totals(draft)
             if previous['receipt']:
                 expected={line['id']:(line['product_id'],line['quantity']) for line in previous['lines']}
@@ -213,7 +215,10 @@ def normalized_payload(payload):
     value.setdefault('cost_definitions',None)
     value.setdefault('supplier_alias','')
     value.setdefault('tracking_number','')
+    value.setdefault('invoice_vat_enabled',False)
+    value.setdefault('invoice_vat_rate','19')
     for line in value['lines']:
+        line.pop('invoice_vat_share_cents',None)
         line.setdefault('vat_enabled',False);line.setdefault('vat_rate','19');line.setdefault('vat_included',False)
         line.setdefault('total_cost_cents',None)
         line.setdefault('extra_allocations',{})
@@ -225,12 +230,14 @@ def draft_from_record(row):
     lines=tuple(PurchaseLineInput(r['product_id'],r['quantity'],r['unit_cost_cents'],r['currency'],
         Decimal(r['exchange_rate']) if r['exchange_rate'] is not None else None,
         date.fromisoformat(r['converted_on']) if r['converted_on'] else None,r['id'],
+        invoice_vat_share_cents=r.get('vat_cents',0) if row.get('invoice_vat_enabled') else None,
         vat_enabled=bool(r.get('vat_enabled',False)),vat_rate=Decimal(r.get('vat_rate','19')),vat_included=bool(r.get('vat_included',False)),total_cost_cents=r.get('total_cost_cents'), extra_allocations=json.loads(r.get('extra_allocations_json') or '{}'), **{field:r.get(field,0) for field in ALLOCATION_FIELDS.values()}) for r in row['lines'])
     costs=tuple(PurchaseCostInput(r['category'],r['description'],r['amount_cents'],r['currency'],
         Decimal(r['exchange_rate']) if r['exchange_rate'] is not None else None,
         date.fromisoformat(r['converted_on']) if r['converted_on'] else None) for r in row['costs'])
     return PurchaseDraft(date.fromisoformat(row['purchased_on']),row['supplier'],row['reference'],lines,costs,
-                         bool(row['costs_complete']),row.get('cost_states'),row.get('cost_definitions',default_definitions()),row.get('supplier_alias',''),row.get('tracking_number',''))
+                         bool(row['costs_complete']),row.get('cost_states'),row.get('cost_definitions',default_definitions()),row.get('supplier_alias',''),row.get('tracking_number',''),
+                         bool(row.get('invoice_vat_enabled',False)),Decimal(row.get('invoice_vat_rate','19')))
 
 
 def matches_progress(row, selected):

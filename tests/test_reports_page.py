@@ -17,7 +17,7 @@ def setup(qtbot,tmp_path):
 
 def test_filters_independent_and_invalid_range_clears(qtbot,tmp_path):
     repo,page=setup(qtbot,tmp_path)
-    sales,expenses,money,profitability=page.panels
+    sales,expenses,money,profitability,purchases,retentions=page.panels
     assert sales.start.date().day()==1
     assert 'Informe elegido' in expenses.html
     expenses.search.setText('inexistente')
@@ -120,4 +120,50 @@ def test_overwrite_denied_and_failure_preserves_file(qtbot,tmp_path,monkeypatch)
     monkeypatch.setattr(module,'write_money_pdf',fail)
     panel.export_pdf()
     assert 'Sin permiso' in panel.error.text() and target.read_bytes()==b'original'
+    repo.close()
+
+
+def test_quick_periods_clear_and_custom_dates(qtbot,tmp_path):
+    repo,page=setup(qtbot,tmp_path);panel=page.panels[0]
+    today=QDate.currentDate()
+    panel.period_buttons['previous'].click()
+    previous=today.addMonths(-1)
+    assert panel.start.date()==QDate(previous.year(),previous.month(),1)
+    assert panel.end.date()==QDate(previous.year(),previous.month(),previous.daysInMonth())
+    panel.period_buttons['year'].click()
+    assert panel.start.date()==QDate(today.year(),1,1) and panel.end.date()==today
+    panel.search.setText('nadie');panel.state.setCurrentIndex(1)
+    panel.clear_button.click()
+    assert not panel.search.text() and panel.state.currentData() is None
+    assert panel.start.date()==QDate(today.year(),today.month(),1)
+    panel.start.setDate(QDate(2020,2,1));panel.end.setDate(QDate(2020,2,29))
+    assert panel.period_buttons['custom'].isChecked()
+    assert '29/02/2020' in panel.html
+    assert page.panels[-1].period_buttons['year'].isChecked()
+    repo.close()
+
+
+def test_header_exports_active_preview_and_tracks_errors(qtbot,tmp_path,monkeypatch):
+    repo,page=setup(qtbot,tmp_path)
+    called=[]
+    for i,panel in enumerate(page.panels):
+        monkeypatch.setattr(panel,'export_pdf',lambda i=i:called.append(i))
+    page.tabs.setCurrentIndex(1);page.export_button.click()
+    assert called==[1]
+    panel=page.panels[1];panel.end.setDate(panel.start.date().addDays(-1))
+    assert not page.export_button.isEnabled()
+    page.tabs.setCurrentIndex(0)
+    assert page.export_button.isEnabled()
+    page.export_button.click();assert called==[1,0]
+    repo.close()
+
+
+def test_dates_wrap_without_changing_filter_column_count(qtbot,tmp_path):
+    repo,page=setup(qtbot,tmp_path);panel=page.panels[0]
+    panel.arrange_filters(1100)
+    panel.arrange_filters(930)
+    position=panel.filters_grid.getItemPosition(panel.filters_grid.indexOf(panel.dates_bar))
+    assert position==(1,0,1,2)
+    panel.arrange_filters(1100)
+    assert panel.filters_grid.getItemPosition(panel.filters_grid.indexOf(panel.dates_bar))==(0,1,1,1)
     repo.close()

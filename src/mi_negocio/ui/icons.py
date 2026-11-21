@@ -4,6 +4,7 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 PATHS = {
+    'table': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
     'attachment': '<path d="m8 12 7-7a3 3 0 0 1 4 4L9 19a5 5 0 0 1-7-7L12 2M6 14l8-8a1 1 0 0 1 2 2l-8 8"/>',
     'inventory': '<path d="M3 7h18v14H3zM2 3h20v4H2zM9 11h6"/>',
     'home': '<path d="M3 10 12 3l9 7v11h-6v-7H9v7H3z"/>',

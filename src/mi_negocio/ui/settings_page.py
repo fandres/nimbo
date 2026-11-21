@@ -106,7 +106,7 @@ class SettingsPage(QWidget):
         root.addWidget(note('Configuración','heading'));root.addWidget(note('Personaliza tus formas de pago y cuentas. Los cambios no alteran ventas anteriores.'))
         self.preferences=preferences if preferences is not None else DisplayPreferences()
         tabs=QTabWidget();root.addWidget(tabs)
-        root.addWidget(note('Nimbo · MIT © 2026 fandres323. Utiliza Qt / PySide6 bajo LGPLv3. Licencias, avisos y sustitución de bibliotecas: consulta los archivos incluidos con el programa.'))
+        root.addWidget(note('Nimbo · MIT © 2026 fandres. Utiliza Qt / PySide6 bajo LGPLv3. Licencias, avisos y sustitución de bibliotecas: consulta los archivos incluidos con el programa.'))
         display=QWidget();display_box=QVBoxLayout(display)
         display_box.addWidget(note('Información de compras','cardTitle'))
         self.monthly_purchases=QCheckBox('Mostrar el total comprado en el mes actual')
@@ -116,6 +116,23 @@ class SettingsPage(QWidget):
         display_box.addWidget(note('Desactivado de forma predeterminada. Esta preferencia se guarda en este equipo.'))
         self.display_error=note('','error');display_box.addWidget(self.display_error);display_box.addStretch()
         tabs.addTab(display,'Visualización')
+        from ..quick_entries import QuickEntriesRepository
+        quick_repository=QuickEntriesRepository(repository.connection)
+        quick_page=QWidget();quick_box=QVBoxLayout(quick_page)
+        quick_box.addWidget(note('Filas incompletas del ingreso rápido','cardTitle'))
+        quick_box.addWidget(note('Siempre puedes guardar filas incompletas. Quedan pendientes de completar y se muestran en rojo en Movimientos.'))
+        self.quick_provisional=QCheckBox('Mostrar los importes conocidos como provisionales en informes de ventas y gastos')
+        self.quick_provisional.setChecked(quick_repository.include_provisional());quick_box.addWidget(self.quick_provisional)
+        quick_box.addWidget(note('Desactivado por defecto: las filas incompletas se excluyen de los informes. Al activarlo aparecen en un apartado separado, según los filtros. Nunca se suman a las operaciones confirmadas ni afectan dinero o inventario.'))
+        self.quick_error=note('','error');quick_box.addWidget(self.quick_error);quick_box.addStretch()
+        def save_quick(value):
+            try:
+                quick_repository.set_include_provisional(value);self.quick_error.clear();self.settings_changed.emit()
+            except StorageError as exc:
+                self.quick_error.setText(str(exc));self.quick_provisional.blockSignals(True)
+                self.quick_provisional.setChecked(not value);self.quick_provisional.blockSignals(False)
+        self.quick_provisional.toggled.connect(save_quick);tabs.addTab(quick_page,'Ingreso rápido')
+
         from .backup_page import BackupPage
         from ..backup_preferences import BackupPreferences
         self.backup_page=BackupPage(repository.connection,self,BackupPreferences(self.preferences.settings))
@@ -128,6 +145,20 @@ class SettingsPage(QWidget):
         for control,area in ((self.vat_sales,'sales'),(self.vat_purchases,'purchases')):
             control.setChecked(self.preferences.vat_default(area));iva_box.addWidget(control)
             control.toggled.connect(lambda checked,a=area:self._save_vat_preference(a,checked))
+        from .sales_widgets import AmountEdit
+        iva_box.addWidget(note('Tarifa inicial de IVA en compras · %'))
+        self.purchase_vat_rate=AmountEdit(str(self.preferences.purchase_vat_rate()))
+        self.purchase_vat_rate.setMaximumWidth(140)
+        iva_box.addWidget(self.purchase_vat_rate)
+        save_purchase_rate=QPushButton('Guardar tarifa de compras')
+        def save_rate():
+            from .form_validation import check, rate_issue
+            if not check(self,[rate_issue(self.purchase_vat_rate,'IVA',100)],self.vat_error):return
+            try:
+                self.preferences.set_purchase_vat_rate(Decimal(self.purchase_vat_rate.text().replace(',','.')))
+                self.vat_error.clear();self.settings_changed.emit()
+            except (OSError,ValidationError) as exc:self.vat_error.setText(str(exc))
+        save_purchase_rate.clicked.connect(save_rate);iva_box.addWidget(save_purchase_rate)
         iva_box.addWidget(self.vat_error);iva_box.addStretch();tabs.addTab(iva_page,'IVA')
 
         from .purchase_concepts_editor import PurchaseConceptsEditor

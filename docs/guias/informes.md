@@ -1,13 +1,15 @@
 # Informes
 
-Abre **Informes** en el menú lateral y elige **Ventas**, **Gastos**, **Dinero** o **Rentabilidad**.
+Abre **Informes** en el menú lateral y elige **Ventas**, **Compras**, **Retenciones**, **Gastos**, **Dinero** o **Rentabilidad**.
 Cada pestaña conserva sus filtros durante la sesión y comienza en el mes actual,
-desde el primer día hasta hoy. Puedes elegir otro mes/año o cambiar Desde/Hasta
-con el calendario. Más años permite consultar períodos antiguos.
+desde el primer día hasta hoy (Retenciones comienza en el año actual).
+Usa **Este mes**, **Mes pasado**, **Este año** o **Personalizado**. Los calendarios
+Desde/Hasta permiten consultar cualquier período anterior. **Limpiar filtros**
+restablece el período inicial y los filtros de la pestaña actual.
 
 La vista previa se actualiza al cambiar filtros. **Actualizar** vuelve a consultar
 los registros y las opciones de cuentas/categorías. **Exportar PDF** guarda el
-contenido que estás viendo; si el archivo existe pide confirmación para reemplazarlo.
+contenido de la pestaña activa que estás viendo; si el archivo existe pide confirmación para reemplazarlo.
 Un rango inválido o un error de consulta limpia el informe y bloquea su exportación.
 
 - **Ventas:** búsqueda, cuenta, estado del cobro, vigencia y retenciones. Los
@@ -22,9 +24,29 @@ Un rango inválido o un error de consulta limpia el informe y bloquea su exporta
   módulo Dinero para transferencias internas, tarjetas y retenciones. El flujo
   no equivale a utilidad ni a saldo disponible.
 
-No modifica registros ni reemplaza los certificados de retención o documentos
+La consulta y exportación no modifican operaciones ni reemplazan los certificados de retención o documentos
 originales. Exportación PDF A4 horizontal con ajuste de texto y encabezados de
 tabla repetidos cuando hay varias páginas.
+
+## Retenciones
+
+Comienza en el año actual. Filtra por fechas, cliente, cédula/NIT, correo,
+factura o estado del certificado. Incluye ventas vigentes con retención y distingue
+las registradas al cobrar, las pendientes de cobro y las históricas informativas.
+
+En **Gestionar certificados**, cada cliente y año tiene un estado: **Pendiente de
+solicitar**, **Solicitado** o **Recibido**, además de una nota opcional y un historial.
+El estado se guarda al seleccionarlo; la nota, al salir del campo. Estos cambios
+no modifican ventas, cobros ni saldos. El PDF incluye los estados y el detalle de
+las facturas del período consultado.
+
+El estado corresponde al año completo aunque filtres un mes. Los importes sí
+corresponden al período filtrado. Una búsqueda selecciona el grupo del cliente
+y año con todas sus facturas dentro de ese período.
+
+Se agrupa por identificación; si falta, se utiliza el nombre normalizado y se
+avisa para revisarlo. Corregir la identificación crea otro grupo pendiente: el
+seguimiento anterior no se transfiere automáticamente.
 
 ## Rentabilidad
 
@@ -56,3 +78,19 @@ gastos del período, ya que estos no se atribuyen arbitrariamente a un cliente.
 Es un **resultado de gestión**, no una liquidación fiscal ni flujo de caja. El costo
 de compras conserva su IVA registrado; no determina si es fiscalmente descontable.
 El PDF exporta exactamente la vista previa consultada, incluidos sus avisos.
+
+### Soportes del certificado
+
+En **Gestionar certificados**, usa el clip de la columna **Soportes** para adjuntar
+PDF, PNG o JPG, abrir una copia, consultar su carpeta o quitarla del seguimiento.
+El número junto al clip indica los archivos activos del cliente y año.
+
+Las copias se guardan en `Documentos/<año>/Retenciones/cliente-<id>/` y se incluyen
+en los respaldos. El identificador interno evita mezclar clientes con nombres
+iguales. Se conserva el archivo original. Al quitar un adjunto, la copia permanece
+en la carpeta, igual que con los demás documentos de Nimbo.
+
+Después de adjuntar correctamente, puedes aceptar marcar el certificado como
+**Recibido**. Si eliges no hacerlo, conserva su estado. Quitar un documento no cambia
+el estado automáticamente. La fecha del filtro no cambia la asociación anual del
+soporte. No se envían correos ni se interpreta automáticamente el contenido.

@@ -183,12 +183,36 @@ class SalesRepository:
             raise StorageError('La fecha de cobro debe estar entre la venta y hoy.')
         if receipt.commission_cents+deducted(sale)>sale['total_cents']: raise StorageError('La comisión y la retención superan el total cobrado.')
         self._account(receipt.account_id)
+        method=self.connection.execute('SELECT account_kind FROM payment_methods WHERE id=?',(sale['method_id'],)).fetchone()
+        if method and method[0]=='bank':
+            account=self.connection.execute('SELECT kind FROM accounts WHERE id=?',(receipt.account_id,)).fetchone()
+            if account[0]!='bank':raise StorageError('Para esta forma de pago elige una cuenta bancaria o billetera.')
         self.connection.execute('INSERT INTO receipts VALUES(?,?,?,?)',(key,receipt.received_on.isoformat(),receipt.account_id,receipt.commission_cents))
 
-    def confirm_receipt(self,sale_id,receipt):
+    def _set_payment_method(self,sale,method):
+        if sale['receipt']:raise StorageError('La forma de pago de un cobro registrado se conserva en el historial.')
+        self._require_permission('edit')
+        from .settings_repository import SettingsRepository
+        current=next((m for m in SettingsRepository(self.connection).list_methods() if m.id==method.id),None)
+        if current!=method:raise StorageError('Cambió la forma de pago en Configuración. Cierra y vuelve a abrir para actualizarla.')
+        rate,fixed=effective_fee(method,sale['total_cents']);validate_fee(rate,fixed)
+        from .sales import SaleLineInput
+        total=calculate_totals((SaleLineInput(0,1,sale['total_cents']),),0,0,rate,fixed)
+        self.connection.execute('UPDATE sales SET method_id=?,method_name=?,provider=?,rate_percent=?,fixed_cents=?,commission_cents=? WHERE id=?',
+            (method.id,method.name,method.provider,str(rate),fixed,total.commission_cents,sale['id']))
+
+    def confirm_receipt(self,sale_id,receipt,*,payment_method=None,expected_sale=None):
         with operation(self.connection):
+            self._require_permission('edit')
+            before=self._editable(sale_id)
+            if expected_sale is not None and before!=expected_sale:
+                raise StorageError('La venta cambió desde que abriste el cobro. Cierra y vuelve a abrir para revisar los datos actuales.')
+            if payment_method is not None:self._set_payment_method(before,payment_method)
             self._receipt(sale_id,receipt)
-            return self._get(sale_id)
+            after=self._get(sale_id)
+            self.connection.execute('INSERT INTO sale_revisions(sale_id,created_at,before_json,after_json) VALUES(?,?,?,?)',
+                (sale_id,datetime.now(timezone.utc).isoformat(),json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False)))
+            return after
 
     def _shipping(self,key,payment):
         sale=self._editable(key)
@@ -216,15 +240,18 @@ class SalesRepository:
             return self._get(sale_id)
 
     def save_detail(self, sale_id, *, invoice_ref, has_withholding, tracking_number,
-                    receipt=None, shipping_payment=None, shipping_details=None, customer_email=None, customer_alias=None, customer_phone=None, lines=None):
+                    receipt=None, shipping_payment=None, shipping_details=None, customer_email=None, customer_alias=None, customer_phone=None, lines=None, payment_method=None, expected_sale=None):
         """Guarda el formulario completo en una sola transacción."""
         with operation(self.connection):
             self._require_permission('edit')
             sale = self._editable(sale_id)
             before=sale
+            if expected_sale is not None and before!=expected_sale:raise StorageError('La venta cambió. Cierra y vuelve a abrir para actualizar los datos.')
             if lines is not None:
                 self._replace_lines(sale,lines)
                 sale=self._get(sale_id)
+            if payment_method is not None:
+                self._set_payment_method(sale,payment_method);sale=self._get(sale_id)
             self._validate_withholding(sale,has_withholding,receipt.commission_cents if receipt else None)
             self.connection.execute('UPDATE sales SET has_withholding=? WHERE id=?',(int(has_withholding),sale_id))
             if receipt is not None:

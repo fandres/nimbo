@@ -1,5 +1,5 @@
 """Compras: importes originales y costos COP, sin movimientos de inventario."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 from .catalog import ValidationError
@@ -8,6 +8,14 @@ from .sales import check_cents, MAX_CENTS
 
 CATEGORIES = {'international_shipping': 'Envío internacional', 'importation': 'Nacionalización / manejo',
               'taxes': 'Impuestos', 'other': 'Otros costos'}
+
+
+COST_STATES = (('Seleccionar…', 'unselected'), ('Pendiente', 'pending'),
+               ('Registrado', 'recorded'), ('No aplica', 'not_applicable'))
+
+
+def cost_states_complete(states):
+    return all(value in ('recorded', 'not_applicable') for value in states.values())
 
 
 @dataclass(frozen=True)
@@ -28,6 +36,7 @@ class PurchaseLineInput:
     vat_enabled: bool = False
     vat_rate: Decimal = Decimal('19')
     vat_included: bool = False
+    invoice_vat_share_cents: int | None = None
 
 
 def line_entered_total(line):
@@ -38,7 +47,15 @@ def line_original_total(line):
     return split_vat(line_entered_total(line),line.vat_enabled,line.vat_rate,line.vat_included)[0]
 
 
+def line_base_cop(line):
+    if line.invoice_vat_share_cents is not None:
+        return convert_to_cop(line_entered_total(line), line.currency, line.exchange_rate) - line.invoice_vat_share_cents
+    return convert_to_cop(line_original_total(line), line.currency, line.exchange_rate)
+
+
 def line_vat_cop(line):
+    if line.invoice_vat_share_cents is not None:
+        return line.invoice_vat_share_cents
     base,tax,total=split_vat(line_entered_total(line),line.vat_enabled,line.vat_rate,line.vat_included)
     return convert_to_cop(total,line.currency,line.exchange_rate)-convert_to_cop(base,line.currency,line.exchange_rate)
 
@@ -49,7 +66,9 @@ def is_vat_cost(name, description=''):
 
 
 def check_duplicate_vat(draft):
-    if not any(line.vat_enabled for line in draft.lines):return
+    if draft.invoice_vat_enabled and any(line.vat_enabled for line in draft.lines):
+        invalid('Elige IVA del total o IVA por producto; no pueden aplicarse juntos.')
+    if not draft.invoice_vat_enabled and not any(line.vat_enabled for line in draft.lines):return
     names=categories_for(draft)
     if any(is_vat_cost(names.get(cost.category,''),cost.description) and cost.amount_cents for cost in draft.costs):
         invalid('Ya calculaste IVA en los productos. Revisa el cargo adicional de IVA para no contarlo dos veces; registra allí solo el arancel u otros cargos.')
@@ -77,6 +96,30 @@ class PurchaseDraft:
     cost_definitions: dict | None = None
     supplier_alias: str = ''
     tracking_number: str = ''
+    invoice_vat_enabled: bool = False
+    invoice_vat_rate: Decimal = Decimal('19')
+
+
+def apply_invoice_vat(draft):
+    """Split included VAT once in COP; allocate exact cents without altering inputs."""
+    if type(draft.invoice_vat_enabled) is not bool:
+        invalid('Revisa la opción de IVA del total.')
+    check_duplicate_vat(draft)
+    split_vat(0, draft.invoice_vat_enabled, draft.invoice_vat_rate, True)
+    if not draft.invoice_vat_enabled:
+        return replace(draft, lines=tuple(replace(line, invoice_vat_share_cents=None) for line in draft.lines))
+    amounts = [convert_to_cop(line_entered_total(line), line.currency, line.exchange_rate) for line in draft.lines]
+    total = sum(amounts)
+    _, tax, _ = split_vat(total, True, draft.invoice_vat_rate, True)
+    cumulative = previous = 0
+    lines = []
+    for line, amount in zip(draft.lines, amounts):
+        cumulative += amount
+        # Integer half-up cumulative shares avoid lost cents and decimal context limits.
+        allocated = (2 * cumulative * tax + total) // (2 * total) if total else 0
+        lines.append(replace(line, invoice_vat_share_cents=allocated - previous))
+        previous = allocated
+    return replace(draft, lines=tuple(lines))
 
 
 @dataclass(frozen=True)
@@ -187,7 +230,7 @@ def validate_purchase(draft):
         invalid('Los gastos asignados superan los registrados en alguna categoría.')
     if draft.cost_states is not None:
         if (set(draft.cost_states) != set(categories) or
-                any(v not in ('pending','recorded','not_applicable') for v in draft.cost_states.values())):
+                any(v not in ('unselected','pending','recorded','not_applicable') for v in draft.cost_states.values())):
             invalid('Revisa el seguimiento de los conceptos.')
         for key, state in draft.cost_states.items():
             exists = any(c.category == key for c in draft.costs)
@@ -195,25 +238,26 @@ def validate_purchase(draft):
                 invalid('Agrega el cargo de '+categories[key]+' antes de marcarlo registrado.')
             if state == 'not_applicable' and exists:
                 invalid(categories[key]+': tiene cargos; no puede marcarse No aplica.')
-        if draft.costs_complete != all(v != 'pending' for v in draft.cost_states.values()):
+        if draft.costs_complete != cost_states_complete(draft.cost_states):
             invalid('El estado global no coincide con los conceptos pendientes.')
 
 
 def calculate_purchase_totals(draft):
+    draft = apply_invoice_vat(draft)
     validate_purchase(draft)
     return preview_purchase_totals(draft)
 
 
 def preview_purchase_totals(draft):
     """Importes del borrador, independientes de cabecera y seguimiento pendientes."""
+    draft = apply_invoice_vat(draft)
     categories=categories_for(draft)
     check_duplicate_vat(draft)
     for line in draft.lines:
         if type(line.quantity) is not int or not 1 <= line.quantity <= MAX_CENTS:
             invalid('La cantidad debe ser un entero positivo.')
         check_cents(line.unit_cost_cents)
-    merchandise = sum(convert_to_cop(line_original_total(line), line.currency, line.exchange_rate)
-                      for line in draft.lines)
+    merchandise = sum(line_base_cop(line) for line in draft.lines)
     vat=sum(line_vat_cop(line) for line in draft.lines)
     shipping=0;taxes=vat
     for cost in draft.costs:

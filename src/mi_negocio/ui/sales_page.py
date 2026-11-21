@@ -23,6 +23,8 @@ from .sales_report import build_sales_report
 from .money_report import write_money_pdf
 
 
+from .quick_entry_dialog import QuickEntryDialog, PendingEntries, quick_button
+
 class SalesPage(QWidget):
     sales_changed=Signal()
     opening_failed=Signal(str)
@@ -32,6 +34,7 @@ class SalesPage(QWidget):
         root=QVBoxLayout(self);root.setContentsMargins(24,18,24,18)
         header=QHBoxLayout();header.addWidget(note('Ventas','heading'))
         header.addWidget(note('Registra tus ventas y confirma el dinero cuando llegue.'),1)
+        self.quick=quick_button();header.addWidget(self.quick);self.quick.clicked.connect(lambda:self.open_quick())
         new=QPushButton('+ Nueva venta');new.setObjectName('primary');header.addWidget(new);root.addLayout(header)
         self.tabs=QTabBar();self.tabs.addTab('Resumen');self.tabs.addTab('Movimientos');self.tabs.setExpanding(False)
         self.tabs.setStyleSheet('QTabBar::tab { padding: 10px 16px; background: transparent; border-bottom: 2px solid transparent; } QTabBar::tab:selected { color: #315bea; border-bottom: 2px solid #315bea; }')
@@ -92,9 +95,10 @@ class SalesPage(QWidget):
         self.use_dates.toggled.connect(self._custom_dates)
         self.table=QTableWidget(0,8);self.table.setHorizontalHeaderLabels(['Fecha','Cliente','Factura','Total · COP','Forma de pago','Cuenta','Estado','Acciones']);self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch);self.table.verticalHeader().hide();self.table.verticalHeader().setDefaultSectionSize(44);self.table.setSelectionBehavior(QTableWidget.SelectRows);self.table.setSelectionMode(QTableWidget.SingleSelection);self.table.setEditTriggers(QTableWidget.NoEditTriggers);movement_box.addWidget(self.table,1)
         self.table.verticalHeader().setDefaultSectionSize(66)
-        for column,width in [(0,105),(2,65),(3,155),(4,135),(5,130),(6,105),(7,150)]:
+        for column,width in [(0,105),(2,65),(3,155),(4,135),(5,130),(6,105),(7,210)]:
             self.table.horizontalHeader().setSectionResizeMode(column,QHeaderView.Fixed);self.table.setColumnWidth(column,width)
         self.table.setShowGrid(False)
+        self.quick_pending=PendingEntries(sales.connection,'sales');movement_box.addWidget(self.quick_pending);self.quick_pending.open_requested.connect(self.open_quick)
         self.error=note('','error');self.error.hide();root.addWidget(self.error);root.addWidget(self.pages,1);self.count=note('');movement_box.addWidget(self.count);detail=QPushButton('Ver detalle / Cobrar');movement_box.addWidget(detail)
         new.clicked.connect(self.open_new_sale);detail.clicked.connect(self.open_detail);self.table.cellDoubleClicked.connect(self.open_detail)
         for signal in (self.vat_filter.currentIndexChanged,self.validity.currentIndexChanged,self.search.textChanged,self.withholding.currentIndexChanged,self.state.currentIndexChanged,self.account.currentIndexChanged,self.use_dates.toggled,self.start.dateChanged,self.end.dateChanged):signal.connect(self.refresh_sales)
@@ -156,6 +160,7 @@ class SalesPage(QWidget):
 
     def refresh_sales(self,*args):
         try:
+            self.quick_pending.refresh()
             if self.use_dates.isChecked() and self.start.date()>self.end.date():raise StorageError('La fecha inicial debe ser anterior o igual a la final.')
             month=self.month.currentData()
             start=date(self.year.currentData(),month,1) if month else (self.start.date().toPython() if self.use_dates.isChecked() else None)
@@ -188,10 +193,19 @@ class SalesPage(QWidget):
                     self.table.item(i,1).setText((s['customer_name'] or '—')+'\n'+names[0]+(f' +{len(names)-1}' if len(names)>1 else ''))
                     self.table.item(i,1).setToolTip('\n'.join(names))
                 action=QPushButton('Confirmar cobro' if not s['received'] and not s['cancelled_at'] else 'Ver detalle')
-                action.setStyleSheet('font-size: 12px; padding: 7px 8px;')
+                action.setStyleSheet('font-size: 12px; padding: 7px 10px;')
+                action.setSizePolicy(QSizePolicy.Minimum,QSizePolicy.Fixed)
+                action.setCursor(Qt.PointingHandCursor)
+                action.setToolTip(action.text())
                 if not s['received'] and not s['cancelled_at']:action.setObjectName('primary')
                 action.clicked.connect(lambda checked=False,key=s['id'],collect=not s['received'] and not s['cancelled_at']:self.open_sale_detail(key,collect))
-                self.table.setCellWidget(i,7,with_attachment(action,self.sales.connection,'sale',s['id']))
+                actions=with_attachment(action,self.sales.connection,'sale',s['id'])
+                actions.layout().setContentsMargins(4,0,4,0)
+                actions.layout().setAlignment(Qt.AlignVCenter)
+                self.table.setCellWidget(i,7,actions)
+                actions.ensurePolished()
+                # Qt removes the cell's horizontal padding from the widget area.
+                self.table.setColumnWidth(7,max(self.table.columnWidth(7),actions.sizeHint().width()+24))
                 status_item=self.table.item(i,6)
                 status_item.setForeground(QColor('#758198' if s['cancelled_at'] else '#137844' if s['received'] else '#975d00'))
                 badge=note(status_item.text());badge.setAlignment(Qt.AlignCenter);badge.setWordWrap(False)
@@ -259,6 +273,11 @@ class SalesPage(QWidget):
 
     def changed(self,*args):self.refresh_sales();self.sales_changed.emit()
 
+    def open_quick(self,entry_id=None):
+        if self.dialog and self.dialog.isVisible():self.dialog.raise_();return
+        self.dialog=QuickEntryDialog(self.sales.connection,'sales',self.window(),self.preferences,entry_id)
+        self.dialog.saved.connect(self.changed);self.dialog.show()
+
     def open_new_sale(self):
         if self.dialog and self.dialog.isVisible():self.dialog.raise_();return
         try:
@@ -275,10 +294,22 @@ class SalesPage(QWidget):
     def open_sale_detail(self,key,collect=False):
         if self.dialog and self.dialog.isVisible():self.dialog.raise_();return
         try:
-            self.dialog=SaleDetailDialog(key,self.settings,self.sales,self.window())
-            if collect and not self.dialog.sale['cancelled_at'] and not self.dialog.sale['received']:self.dialog.received.setChecked(True)
+            if collect:
+                from .receipt_dialog import ReceiptDialog
+                self.dialog=ReceiptDialog(key,self.settings,self.sales,self.window())
+            else:self.dialog=SaleDetailDialog(key,self.settings,self.sales,self.window())
             self.dialog.saved.connect(self.changed);self.dialog.show()
-        except StorageError as e:self.error.setText(str(e));self.error.show()
+        except StorageError as e:self.error.setText(str(e));self.error.show();self.opening_failed.emit(str(e))
+
+    def show_period(self,start=None,end=None):
+        controls=(self.month,self.use_dates,self.start,self.end,self.search,self.account,self.state,self.validity,self.withholding,self.vat_filter,self.min_total,self.max_total)
+        for control in controls:control.blockSignals(True)
+        self.month.setCurrentIndex(0);self.use_dates.setChecked(start is not None)
+        if start is not None:self.start.setDate(QDate(start.year,start.month,start.day));self.end.setDate(QDate(end.year,end.month,end.day))
+        self.search.clear();self.min_total.clear();self.max_total.clear()
+        for combo in (self.account,self.state,self.validity,self.withholding,self.vat_filter):combo.setCurrentIndex(0)
+        for control in controls:control.blockSignals(False)
+        self._custom_dates(start is not None);self.tabs.setCurrentIndex(1);self.refresh_accounts();self.refresh_sales()
 
     def show_pending(self):
         self.tabs.setCurrentIndex(1)

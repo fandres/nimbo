@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nimbo"
-version = "0.5.0b1"
+version = "0.6.0b2"
 license = {file = "LICENSE"}
-authors = [{name = "fandres323"}]
+authors = [{name = "fandres"}]
 description = "Nimbo: catálogo, ventas y cobros para emprendedores"
 requires-python = ">=3.11"
 dependencies = ["PySide6>=6.8,<7"]
@@ -25,3 +25,6 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 qt_api = "pyside6"
+
+[tool.setuptools.package-data]
+mi_negocio = ["assets/*.svg"]

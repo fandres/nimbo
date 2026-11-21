@@ -45,7 +45,7 @@ def test_grouped_costs_keep_edit_mapping(qtbot,tmp_path):
     editor=dlg.cost_editor
     editor.set_costs((PurchaseCostInput('taxes','Primer cargo',100),PurchaseCostInput('taxes','Segundo cargo',200)))
     assert len(editor.state_combos)==4
-    editor.state_combos['taxes'].setCurrentIndex(1)
+    editor.state_combos['taxes'].setCurrentIndex(editor.state_combos['taxes'].findData('recorded'))
     assert dlg.draft().cost_states['taxes']=='recorded'
     row=editor.row_costs.index(1);editor.table.setCurrentCell(row,0);editor.remove_selected()
     assert len(editor.costs())==1 and editor.costs()[0].amount_cents==100
@@ -123,7 +123,7 @@ def test_legacy_received_purchase_state_opens_with_one_click_and_saves(qtbot,tmp
     _choose_open_status(qtbot, combo, 'recorded')
     assert combo.currentData()=='recorded'
     assert dlg.draft().cost_states['international_shipping']=='recorded'
-    assert dlg.draft().cost_states['taxes']=='pending'
+    assert dlg.draft().cost_states['taxes']=='unselected'
     assert dlg.cost_editor.dialog is None
     assert repo.get(purchase['id'])['cost_states'] is None  # Only save persists changes.
     dlg.save()

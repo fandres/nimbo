@@ -111,3 +111,16 @@ def test_export_state_and_cancelled_filter(qtbot,tmp_path,monkeypatch):
     assert 'FE-0' in saved[1] and 'Anulada' in saved[1]
     assert 'Total vigente<br><b>$ 0,00' in saved[1] and 'Retenciones<br><b>$ 0,00' in saved[1]
     cat.close()
+
+
+def test_confirmation_and_attachment_fit_actions_column(qtbot,tmp_path):
+    from PySide6.QtWidgets import QPushButton
+    from mi_negocio.ui.style import STYLE
+    cat,page=setup_page(qtbot,tmp_path)
+    page.setStyleSheet(STYLE);page.resize(1100,720);page.tabs.setCurrentIndex(1)
+    page.show();qtbot.waitExposed(page)
+    holder=page.table.cellWidget(0,7)
+    confirm=next(b for b in holder.findChildren(QPushButton) if b.text()=='Confirmar cobro')
+    assert page.table.columnWidth(7)>=holder.sizeHint().width()
+    qtbot.waitUntil(lambda:confirm.width()>=confirm.sizeHint().width())
+    cat.close()

@@ -10,7 +10,7 @@ from dataclasses import replace
 from PySide6.QtCore import Qt, Signal, QDate, QEvent, QTimer
 from PySide6.QtWidgets import (QDialog,QFrame,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QGridLayout,QScrollArea,QPushButton,QComboBox,QCheckBox,QTableWidget,QTableWidgetItem,QHeaderView,QLineEdit,QButtonGroup,QAbstractItemView,QCompleter)
 from .form_validation import check, required, choice, amount_issue, rate_issue
-from ..sales import SaleLineInput,SaleDraft,ReceiptInput,ShippingPaymentInput,calculate_totals,money
+from ..sales import SaleLineInput,SaleDraft,ReceiptInput,ShippingPaymentInput,calculate_totals,money,informative_withholding
 from ..catalog import ValidationError
 from ..storage import StorageError
 from .style import STYLE,format_cop
@@ -157,6 +157,10 @@ class SaleDialog(QDialog):
         retention_row.addWidget(note('(2,5 %)', 'muted'))
         retention_row.addStretch()
         invoice_layout.addLayout(retention_row)
+        self.withholding_amount=note('','fieldHeading')
+        self.withholding_amount.setStyleSheet('color: #244dc0; font-size: 14px; font-weight: 700;')
+        self.withholding_amount.hide()
+        invoice_layout.addWidget(self.withholding_amount)
         delivery.addWidget(invoice_frame, 0, 0)
         shipping_frame = QFrame()
         shipping_frame.setObjectName('shippingGroup')
@@ -373,6 +377,7 @@ class SaleDialog(QDialog):
         except ValidationError as error:
             self.table.setItem(row,3,QTableWidgetItem('Revisa el precio'))
             self.summary.setText(error_text(error));self.show_error(error_text(error))
+            self.update_withholding_amount()
 
     def remove_line(self,row):
         if 0<=row<len(self.lines):
@@ -594,7 +599,19 @@ class SaleDialog(QDialog):
             if money(price.text())!=line.unit_price_cents or quantity.value()!=line.quantity:
                 raise ValidationError({'productos':'Revisa las cantidades y los precios.'})
 
+    def update_withholding_amount(self):
+        self.withholding_amount.setVisible(self.withholding.isChecked())
+        if not self.withholding.isChecked():return
+        try:
+            self._validate_line_edits()
+            charged=money(self.shipping_charged.text()) if self.shipping.isChecked() else 0
+            totals=calculate_totals(tuple(self.lines),charged,0,Decimal(0),0,**self.vat.values())
+            self.withholding_amount.setText('Valor retenido: '+format_cop(informative_withholding(totals.total_cents)))
+        except ValidationError:
+            self.withholding_amount.setText('Completa los importes para calcular la retención.')
+
     def recalculate(self):
+        self.update_withholding_amount()
         try:
             t=self.totals()
             for row in range(min(len(self.lines),self.table.rowCount())):self._line_total(row)

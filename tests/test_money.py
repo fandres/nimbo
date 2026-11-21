@@ -99,7 +99,7 @@ def test_migration_14_backup_and_rollback(tmp_path,monkeypatch):
         assert not c.execute("SELECT name FROM sqlite_master WHERE name='money_entries'").fetchone()
     monkeypatch.setattr(database,'migrate_money',original)
     cat=CatalogRepository(path)
-    assert cat.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert cat.connection.execute('PRAGMA user_version').fetchone()[0]==29
     assert not cat.connection.execute('PRAGMA foreign_key_check').fetchall()
     assert list(tmp_path.glob('*.backup-*'))
     cat.close()

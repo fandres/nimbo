@@ -1,5 +1,48 @@
 # Nimbo · mejoras para futuras versiones
 
+## Arquitectura de módulos opcionales
+
+Acuerdo del usuario: 18 de noviembre de 2026. **Desarrollo futuro, sin versión
+asignada. Tener presente esta dirección al diseñar nuevas funcionalidades.**
+
+- Comenzar con módulos integrados que se puedan activar desde
+  **Configuración → Módulos**. Cada emprendedor habilitará los que necesite.
+- Mantener separados el código, los datos específicos y las migraciones de cada
+  módulo. Esto no exige una base de datos distinta por módulo.
+- Definir interfaces de acceso a compras, ventas, catálogo, adjuntos e informes,
+  evitando que los módulos opcionales dependan de detalles internos de sus pantallas.
+- Prever un registro común de módulos con identificador estable, versión,
+  dependencias y puntos de integración en navegación y Configuración.
+- Activar o desactivar un módulo debe controlar sus accesos y acciones. Desactivarlo
+  no debe borrar datos, adjuntos ni historial, ni impedir usar las funciones básicas.
+- Los respaldos deben incluir también los datos de módulos desactivados. Definir
+  validaciones de compatibilidad y dependencias antes de habilitar o actualizar.
+- Preparar esta separación para incorporar otros módulos futuros sin reestructurar
+  toda la aplicación. No asumir que las funciones actuales ya son plugins independientes.
+- Los plugins descargables o de terceros quedan como una etapa posterior: requerirán
+  contratos de compatibilidad, instalación, permisos y actualizaciones propios.
+  No implementar ahora un cargador de plugins ni un catálogo de extensiones.
+
+Antes de construir la infraestructura, concretar sus contratos y ciclo de vida
+mediante un diseño técnico y pruebas de activación, desactivación y restauración.
+Por ahora se documenta la dirección; no se realiza una refactorización general.
+
+## Garantías: futuro módulo opcional
+
+Solicitud del usuario: 18 de noviembre de 2026. **Aplazado para el final;
+no implementar ahora ni asignar a la siguiente beta.**
+
+- Candidato inicial a la arquitectura de módulos opcionales descrita arriba.
+- Desactivado de forma predeterminada y activable desde Configuración.
+- Seguimiento desde la fecha de compra, con atajos de **3, 6 y 12 meses** y
+  un plazo personalizado.
+- Propuesta para concretar al retomarlo: vencimiento, tiempo restante, estados
+  vigente/próxima a vencer/vencida y búsqueda por producto, proveedor o factura.
+- Pendiente aclarar si cubre garantías recibidas del proveedor, garantías ofrecidas
+  al cliente o ambas. No asumir resuelta esta distinción.
+- Definir también el seguimiento por producto o unidad, las fechas y las reglas
+  para compras/ventas corregidas o anuladas antes de implementarlo.
+
 ## Asistente inicial: modalidad de compras del negocio
 
 Solicitud del usuario: 23 de octubre de 2026. Pendiente; no implementar en la
@@ -53,7 +96,7 @@ Solicitud: 2 de noviembre de 2026. Pendiente.
 - Permitir cargar el XML de la factura para proponer cliente/proveedor, identificación, factura, fecha, productos, cantidades, precios e impuestos.
 - Mostrar una previsualización editable antes de registrar la operación; no guardar automáticamente ni asumir que una factura ya está pagada.
 - Resolver la correspondencia con los códigos existentes del catálogo y detectar facturas duplicadas.
-- Conservar una copia del documento como adjunto.
+- La copia del XML como adjunto ya está disponible desde el 18 de noviembre de 2026; queda pendiente utilizar su contenido para proponer datos.
 - Evaluar después extracción de PDF e imágenes mediante OCR, indicando datos incompletos o inciertos.
 - Validar los formatos admitidos con muestras de facturas antes de implementar.
 
@@ -67,3 +110,15 @@ Solicitud del usuario: 6 de noviembre de 2026.
   valoración. Definir los métodos admitidos y cómo efectuar el cambio conservando
   trazabilidad; no recalcular ni alterar silenciosamente ventas anteriores.
 - No añadir el selector en esta primera entrega.
+
+## Tema claro, oscuro y automático
+
+Solicitud del usuario: 18 de noviembre de 2026. **Pendiente para versiones futuras;
+no incluir en 0.6.0-beta.2.**
+
+- En Configuración, permitir elegir **Claro**, **Oscuro** o **Según el sistema**.
+- Guardar la preferencia y, en modo automático, seguir el tema del sistema operativo.
+- Centralizar colores y estilos para que los módulos actuales y futuros respeten
+  el tema, incluidos diálogos, tablas, estados, iconos y gráficos.
+- Verificar contraste y legibilidad en Debian y Windows. Definir por separado
+  el aspecto de impresión/PDF para no trasladar fondos oscuros a los documentos.

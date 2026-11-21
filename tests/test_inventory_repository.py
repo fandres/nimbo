@@ -118,7 +118,7 @@ def test_migration_keeps_existing_sales_and_backs_up(tmp_path):
     cat.connection.execute('PRAGMA user_version=11');cat.connection.commit();cat.close()
     cat=CatalogRepository(tmp_path/'legacy')
     assert not InventoryRepository(cat.connection).state()['initialized']
-    assert cat.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert cat.connection.execute('PRAGMA user_version').fetchone()[0]==29
     assert list(tmp_path.glob('legacy.backup-*'));cat.close()
 
 

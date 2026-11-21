@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -51,7 +52,9 @@ def main():
             raise SystemExit('Provide --appimagetool and --runtime paths; see docs/releases/nimbo-alpha.md.')
         args.appimagetool = args.appimagetool.resolve()
         args.runtime = args.runtime.resolve()
-    version = tomllib.loads((ROOT / 'pyproject.toml').read_text())['project']['version'].replace('a1', '-alpha.1').replace('b1', '-beta.1')
+    version = tomllib.loads((ROOT / 'pyproject.toml').read_text())['project']['version']
+    version = re.sub(r'a(\d+)$', r'-alpha.\1', version)
+    version = re.sub(r'b(\d+)$', r'-beta.\1', version)
     output = ROOT / 'dist'
     output.mkdir(exist_ok=True)
     basename = f'Nimbo-{version}-{system}-x86_64'
@@ -64,6 +67,8 @@ def main():
              '--additional-hooks-dir', ROOT / 'packaging/hooks',
              '--exclude-module', 'readline',
              '--windowed', '--name', 'Nimbo', '--paths', ROOT / 'src',
+             '--add-data', str(ROOT/'src/mi_negocio/assets')+os.pathsep+'mi_negocio/assets',
+             '--icon', ROOT/'packaging/nimbo.ico',
              '--distpath', work / 'dist', '--workpath', work / 'work', '--specpath', work,
              ROOT / 'packaging/entry.py'])
         bundle = work / 'dist/Nimbo'

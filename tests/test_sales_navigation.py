@@ -42,7 +42,8 @@ def test_home_updates_after_three_sales_and_fits(qtbot,tmp_path):
     for _ in range(3):QApplication.processEvents()
     assert '3.000' in w.home_page.sales_total.text()
     assert '3 pendientes' in w.home_page.pending_total.text()
-    assert w.home_page.scroll.verticalScrollBar().maximum()==0
+    assert w.home_page.scroll.horizontalScrollBar().maximum()==0
+    w.home_page.scroll.ensureWidgetVisible(w.home_page.catalog_button)
     sales.confirm_receipt(sales.list_sales()[0]['id'],ReceiptInput(date.today(),1,0));w.home_page.refresh_summary()
     assert '2 pendientes' in w.home_page.pending_total.text()
     w.close();repo.close()

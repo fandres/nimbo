@@ -32,7 +32,7 @@ def test_backup_migration(tmp_path):
     path=tmp_path/'db.sqlite3'; old_db(path)
     repo=CatalogRepository(path)
     assert repo.list_products()[0].code=='001'
-    assert repo.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert repo.connection.execute('PRAGMA user_version').fetchone()[0]==29
     repo.close()
     backup=next(tmp_path.glob('*.backup-*'))
     with sqlite3.connect(backup) as db:
@@ -117,7 +117,7 @@ def test_v4_migration_keeps_custom_accounts(tmp_path):
         for table in ('credit_card_events','credit_card_periods','credit_card_charges','credit_cards','credit_card_settings','money_events','money_entries','account_openings','loan_events','loan_payments','loans','expense_revisions','expenses','expense_categories','inventory_movements','inventory_baseline_receipts','inventory_state'): db.execute('DROP TABLE IF EXISTS '+table)
         db.execute('PRAGMA user_version=4')
     repo=CatalogRepository(path)
-    assert repo.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert repo.connection.execute('PRAGMA user_version').fetchone()[0]==29
     assert SettingsRepository(repo.connection).list_accounts()[0].name=='Mi caja'
     assert len(SettingsRepository(repo.connection).list_carriers())==2
     repo.close()
@@ -138,7 +138,7 @@ def test_v5_migration_adds_optional_tracking_and_keeps_settings(tmp_path):
         for table in ('credit_card_events','credit_card_periods','credit_card_charges','credit_cards','credit_card_settings','money_events','money_entries','account_openings','loan_events','loan_payments','loans','expense_revisions','expenses','expense_categories','inventory_movements','inventory_baseline_receipts','inventory_state'): db.execute('DROP TABLE IF EXISTS '+table)
         db.execute('PRAGMA user_version=5')
     repo=CatalogRepository(path)
-    assert repo.connection.execute('PRAGMA user_version').fetchone()[0]==25
+    assert repo.connection.execute('PRAGMA user_version').fetchone()[0]==29
     assert 'tracking_number' in [row[1] for row in repo.connection.execute('PRAGMA table_info(sales)')]
     assert repo.connection.execute('SELECT name FROM carriers WHERE id=1').fetchone()[0]=='Mi transportadora'
     repo.close()

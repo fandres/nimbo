@@ -39,3 +39,19 @@ class DisplayPreferences:
     def set_require_retention_documents(self,enabled):
         self.settings.setValue('sales/require_retention_documents',bool(enabled));self.settings.sync()
         if self.settings.status()!=QSettings.NoError:raise OSError('No se pudo guardar la preferencia de retenciones.')
+
+    def purchase_vat_rate(self):
+        from decimal import Decimal, InvalidOperation
+        from ..vat import split_vat
+        from ..catalog import ValidationError
+        try:
+            rate=Decimal(str(self.settings.value('purchases/vat_rate','19')))
+            split_vat(0,True,rate,True)
+            return rate
+        except (InvalidOperation,ValidationError):return Decimal('19')
+
+    def set_purchase_vat_rate(self,rate):
+        from ..vat import split_vat
+        split_vat(0,True,rate,True)
+        self.settings.setValue('purchases/vat_rate',str(rate));self.settings.sync()
+        if self.settings.status()!=QSettings.NoError:raise OSError('No se pudo guardar la tarifa de IVA.')

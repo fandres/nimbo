@@ -49,10 +49,11 @@ def build_money_report(rows, start, end, account_name, query='', account_id=None
     return f'''<html><head><style>
         body {{ color:#162e50; font-family: sans-serif; font-size:10pt; }}
         h1 {{ font-size:22pt; color:#2458da; }}
-        h2 {{ font-size:12pt; margin-top:16px; }}
-        th {{ background-color:#eaf0ff; color:#162e50; }}
+        h2 {{ font-size:14pt; margin-top:16px; }}
+        th {{ background-color:#f4f6fb; color:#162e50; }}
         td {{ border-bottom:1px solid #e3e8f0; }}
         .muted {{ color:#64748b; }}
+        .metric b {{font-size:16pt;}}
         </style></head><body>
         <h1>Nimbo · Movimientos de dinero</h1>
         <p><b>Período:</b> {start:%d/%m/%Y} al {end:%d/%m/%Y}<br>
@@ -61,9 +62,9 @@ def build_money_report(rows, start, end, account_name, query='', account_id=None
         <span class="muted">Generado: {datetime.now():%d/%m/%Y %H:%M} · Moneda: COP</span></p>
         <h2>Flujo de efectivo del filtro</h2>
         <table width="100%" cellspacing="0" cellpadding="10"><tr>
-        <td bgcolor="#eaf0ff">Entradas<br><b>{format_cop(incoming)}</b></td>
-        <td bgcolor="#fff2e5">Salidas<br><b>{format_cop(outgoing)}</b></td>
-        <td bgcolor="{net_background}">Flujo neto del filtro<br><b>{format_cop(incoming-outgoing)}</b></td>
+        <td class="metric" style="color:#162e50" bgcolor="#f6f8fd">Entradas<br><b>{format_cop(incoming)}</b></td>
+        <td class="metric" style="color:#925900" bgcolor="#f6f8fd">Salidas<br><b>{format_cop(outgoing)}</b></td>
+        <td class="metric" bgcolor="{net_background}">Flujo neto del filtro<br><b>{format_cop(incoming-outgoing)}</b></td>
         </tr></table>
         <p class="muted">Cobros y pagos registrados; no representa utilidad ni saldo disponible.
         Se excluyen del flujo las tarjetas y los movimientos sin cuenta.

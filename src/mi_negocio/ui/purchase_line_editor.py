@@ -1,66 +1,95 @@
-from .numeric_spinbox import NumericSpinBox as QSpinBox
+from PySide6.QtWidgets import QSpinBox
 """Edición de una línea de mercancía antes de guardar el pedido."""
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QButtonGroup,QCompleter,QDialog,QVBoxLayout,QFormLayout,QComboBox,QPushButton,QHBoxLayout
-from .vat_fields import VatFields
+from PySide6.QtCore import Qt, QEvent
+from PySide6.QtWidgets import QButtonGroup,QCompleter,QDialog,QVBoxLayout,QGridLayout,QFrame,QComboBox,QPushButton,QHBoxLayout,QWidget
+from .purchase_line_fields import PurchaseVatFields, PurchaseCurrencyFields, choice_button
 from .preferences import DisplayPreferences
 from ..vat import split_vat
 from .completion import enable_unique_tab
 from .form_validation import check, amount_issue
-from ..purchases import PurchaseLineInput, convert_to_cop, line_original_total, line_entered_total
+from ..purchases import PurchaseLineInput, convert_to_cop, line_entered_total
 from decimal import Decimal, ROUND_HALF_UP
 from ..sales import money
 from ..purchase_allocation import ALLOCATION_FIELDS
 from ..catalog import ValidationError
-from .purchase_cost_editor import CurrencyFields
 from .sales_widgets import AmountEdit, cents_text, note, error_text
-from .style import STYLE
+from .style import STYLE, format_cop
 
 
 class PurchaseLineDialog(QDialog):
     def __init__(self, products, line=None, historical_name='', parent=None,preferences=None):
         super().__init__(parent); self.setStyleSheet(STYLE); self.setWindowModality(Qt.WindowModal)
-        self.setWindowTitle('Producto comprado'); self.resize(680,390); self.result_line=None; self.original=line; self.validate_candidate=None
-        root=QVBoxLayout(self); root.addWidget(note('Qué compramos','cardTitle'))
-        form=QFormLayout(); self.product=QComboBox(); self.product.setEditable(True)
+        self.setWindowTitle('Producto comprado'); self.resize(820,760); self.result_line=None; self.original=line; self.validate_candidate=None
+        self.setStyleSheet(STYLE+"""
+        QWidget#exchangeCard { background: #f7f9fd; border: 1px solid #e2e8f2; border-radius: 10px; }
+        QFrame#purchaseSummary { background: white; border: 1px solid #e2e8f2; border-radius: 12px; }
+        QLabel#purchaseTotal { color: #142b50; font-size: 22px; font-weight: 700; }
+        QPushButton#paymentChoice { padding: 8px 10px; }
+        QPushButton#quantityStep { padding: 0; color: #315fda; font-size: 18px; min-height: 34px; }
+        QSpinBox#purchaseQuantity { padding: 5px 2px; min-height: 26px; }
+        QSpinBox#purchaseQuantity::up-button, QSpinBox#purchaseQuantity::down-button { width: 0; height: 0; }
+        """)
+        root=QVBoxLayout(self);root.setContentsMargins(24,20,24,16);root.setSpacing(8)
+        root.addWidget(note('Qué compramos','cardTitle'))
+        root.addWidget(note('Producto','fieldHeading'))
+        self.product=QComboBox();self.product.setEditable(True)
         self.product.setInsertPolicy(QComboBox.NoInsert)
-        for p in products: self.product.addItem(p.code+' · '+p.name,p.id)
-        if line and self.product.findData(line.product_id)<0:
-            self.product.addItem(historical_name,line.product_id)
-        self.product.setCurrentIndex(-1); self.product.lineEdit().setPlaceholderText('Buscar por código o nombre…')
-        self.product.completer().setFilterMode(Qt.MatchContains); self.product.completer().setCaseSensitivity(Qt.CaseInsensitive)
-        self.product.completer().setCompletionMode(QCompleter.PopupCompletion)
-        enable_unique_tab(self.product)
-        self.quantity=QSpinBox(); self.quantity.setRange(1,1000000000)
-        self.amount=AmountEdit(); self.amount.setPlaceholderText('Costo de compra'); self.amount.setFixedWidth(240)
-        self.cost_mode=QButtonGroup(self)
-        self.total_mode=QPushButton('Total'); self.unit_mode=QPushButton('Por unidad')
-        modes=QHBoxLayout(); modes.setSpacing(0)
-        for button in (self.total_mode,self.unit_mode):
-            button.setCheckable(True); button.setAutoDefault(False)
-            button.setObjectName('paymentChoice'); self.cost_mode.addButton(button)
-            modes.addWidget(button)
-        self.total_mode.setToolTip('Costo total de todas estas unidades')
-        self.unit_mode.setToolTip('Costo de una sola unidad')
-        self.total_mode.setChecked(True)
-        self.amount_label=note('Costo total')
-        self.amount_label.setFixedWidth(self.amount_label.fontMetrics().horizontalAdvance('Costo por unidad')+8)
-        self.amount_label.setWordWrap(False)
+        for p in products:self.product.addItem(p.code+' · '+p.name,p.id)
+        if line and self.product.findData(line.product_id)<0:self.product.addItem(historical_name,line.product_id)
+        self.product.setCurrentIndex(-1);self.product.lineEdit().setPlaceholderText('Buscar por código o nombre…')
+        self.product.completer().setFilterMode(Qt.MatchContains);self.product.completer().setCaseSensitivity(Qt.CaseInsensitive)
+        self.product.completer().setCompletionMode(QCompleter.PopupCompletion);enable_unique_tab(self.product)
+        root.addWidget(self.product)
+        grid=QGridLayout();grid.setHorizontalSpacing(14);grid.setVerticalSpacing(6)
+        grid.addWidget(note('Cantidad','fieldHeading'),0,0)
+        self.amount_label=note('Costo','fieldHeading');grid.addWidget(self.amount_label,0,1)
+        self.cost_mode=QButtonGroup(self);modes=QHBoxLayout();modes.setSpacing(0)
+        self.total_mode=choice_button('Total de la compra',self.cost_mode,modes)
+        self.unit_mode=choice_button('Por unidad',self.cost_mode,modes)
+        self.total_mode.setToolTip('Total de todas las unidades de este producto')
+        self.total_mode.setChecked(True);grid.addLayout(modes,0,2)
+        quantity_row=QHBoxLayout();quantity_row.setSpacing(0)
+        self.decrease=QPushButton('−');self.increase=QPushButton('+')
+        self.quantity=QSpinBox();self.quantity.setRange(1,1000000000)
+        self.quantity.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows);self.quantity.setAlignment(Qt.AlignCenter)
+        self.quantity.setObjectName('purchaseQuantity');self.quantity.setAccessibleName('Cantidad');self.quantity.setMinimumWidth(80)
+        for button in (self.decrease,self.increase):button.setAutoDefault(False);button.setFixedWidth(32);button.setObjectName('quantityStep')
+        self.decrease.setAccessibleName('Disminuir cantidad');self.increase.setAccessibleName('Aumentar cantidad')
+        self.decrease.clicked.connect(lambda:self.quantity.stepDown() if self.quantity.isEnabled() else None)
+        self.increase.clicked.connect(lambda:self.quantity.stepUp() if self.quantity.isEnabled() else None)
+        quantity_row.addWidget(self.decrease);quantity_row.addWidget(self.quantity);quantity_row.addWidget(self.increase)
+        quantity_box=QWidget();quantity_box.setLayout(quantity_row);quantity_box.setMaximumWidth(170)
+        quantity_row.setContentsMargins(0,0,0,0);grid.addWidget(quantity_box,1,0)
+        cost_row=QHBoxLayout();cost_row.setSpacing(6)
+        self.currencies=QButtonGroup(self)
+        self.cop_button=choice_button('COP',self.currencies,cost_row)
+        self.usd_button=choice_button('USD',self.currencies,cost_row)
+        self.cop_button.setChecked(True)
+        self.amount=AmountEdit();self.amount.setPlaceholderText('Costo de compra');self.amount.setAlignment(Qt.AlignRight)
+        cost_row.addWidget(self.amount,1);grid.addLayout(cost_row,1,1,1,2)
         self.cost_preview=note('Ingresa el costo de todas las unidades de este producto.')
-        self._switching=False; self._exact_total=None; self._mode='total'
-        form.addRow('Producto',self.product); form.addRow('Cantidad',self.quantity)
-        cost_row=QHBoxLayout(); cost_row.addWidget(self.amount); cost_row.addLayout(modes); cost_row.addStretch(1)
-        form.addRow(self.amount_label,cost_row)
-        form.addRow(self.cost_preview)
-        root.addLayout(form)
+        grid.addWidget(self.cost_preview,2,1,1,2)
+        self.exchange=PurchaseCurrencyFields();grid.addWidget(self.exchange,3,1,1,2)
+        grid.setColumnStretch(1,1);grid.setColumnStretch(2,1);root.addLayout(grid)
         preferences=preferences or DisplayPreferences()
-        self.vat=VatFields(preferences.vat_default('purchases'));root.addWidget(self.vat)
-        self.vat_preview=note('');root.addWidget(self.vat_preview)
-        self.exchange=CurrencyFields(); root.addWidget(self.exchange)
-        root.addWidget(note('Agrega envío, impuestos y otros cargos en 3 · Costos adicionales del pedido.'))
+        self.vat=PurchaseVatFields(preferences.vat_default('purchases'));self.vat.set_values(preferences.vat_default('purchases'),preferences.purchase_vat_rate(),False);root.addWidget(self.vat)
+        summary=QFrame();summary.setObjectName('purchaseSummary');summary_layout=QVBoxLayout(summary)
+        summary_layout.setContentsMargins(18,14,18,14);summary_layout.setSpacing(8)
+        self.base_summary=note('—');self.vat_summary=note('—');self.total_summary=note('—','purchaseTotal')
+        self.vat_caption=note('IVA')
+        for label,value in ((note('Base (mercancía)'),self.base_summary),(self.vat_caption,self.vat_summary)):
+            row=QHBoxLayout();row.addWidget(label);row.addStretch();row.addWidget(value);summary_layout.addLayout(row)
+        rule=QFrame();rule.setFrameShape(QFrame.HLine);summary_layout.addWidget(rule)
+        row=QHBoxLayout();row.addWidget(note('Total a pagar','fieldHeading'));row.addStretch();row.addWidget(self.total_summary);summary_layout.addLayout(row)
+        self.vat_preview=note('');summary_layout.addWidget(self.vat_preview);root.addWidget(summary)
+        root.addWidget(note('Solo mercancía de este producto. Envío, impuestos y otros cargos se agregan en el paso 3 · Costos adicionales del pedido.'))
+        self._switching=False;self._exact_total=None;self._mode='total'
+        self.currencies.buttonClicked.connect(lambda:self.exchange.currency.setCurrentText('USD' if self.usd_button.isChecked() else 'COP'))
+        self.exchange.currency.currentTextChanged.connect(lambda currency:(self.usd_button if currency=='USD' else self.cop_button).setChecked(True))
+        root.addStretch(1)
         self.error=note('','error'); root.addWidget(self.error)
         buttons=QHBoxLayout(); cancel=QPushButton('Cancelar'); apply=QPushButton('Aplicar al formulario'); apply.setObjectName('primary'); apply.setDefault(True); cancel.setAutoDefault(False)
-        buttons.addWidget(cancel); buttons.addWidget(apply); root.addLayout(buttons)
+        buttons.addWidget(cancel,1); buttons.addWidget(apply,2); root.addLayout(buttons)
         cancel.clicked.connect(self.reject); apply.clicked.connect(self.accept_line)
         if line:
             self.product.setCurrentIndex(self.product.findData(line.product_id)); self.product.setEnabled(line.line_id is None)
@@ -73,7 +102,22 @@ class PurchaseLineDialog(QDialog):
         self.quantity.valueChanged.connect(self.cost_changed)
         self.exchange.changed.connect(self.update_preview)
         self.vat.changed.connect(self.update_preview)
+        self.setTabOrder(self.product,self.quantity)
+        self.setTabOrder(self.quantity,self.amount)
+        self.setTabOrder(self.amount,self.total_mode)
+        self.setTabOrder(self.total_mode,self.unit_mode)
+        self.quantity.installEventFilter(self)
+        self.quantity.valueChanged.connect(self._quantity_controls)
+        self._quantity_controls()
         self.cost_changed()
+
+    def _quantity_controls(self, *_):
+        self.decrease.setEnabled(self.quantity.isEnabled() and self.quantity.value()>self.quantity.minimum())
+        self.increase.setEnabled(self.quantity.isEnabled() and self.quantity.value()<self.quantity.maximum())
+
+    def eventFilter(self, obj, event):
+        if obj is self.quantity and event.type()==QEvent.EnabledChange:self._quantity_controls()
+        return super().eventFilter(obj,event)
 
     def cost_changed(self, *_):
         if self._switching:return
@@ -97,24 +141,34 @@ class PurchaseLineDialog(QDialog):
             self._exact_total=None
         finally:self._switching=False
         self._mode=new_mode
-        self.amount_label.setText('Costo total' if new_mode=='total' else 'Costo por unidad')
+        self.amount.setAccessibleName('Costo total' if new_mode=='total' else 'Costo por unidad')
         self.update_preview()
 
     def update_preview(self):
         try:
             total=self.original_total();quantity=self.quantity.value()
             unit=int((Decimal(total)/quantity).quantize(Decimal('1'),rounding=ROUND_HALF_UP))
-            currency=self.exchange.currency.currentText()
+            currency,rate,_=self.exchange.values()
             values=self.vat.values();base,vat,gross=split_vat(total,values['vat_enabled'],values['vat_rate'],values['vat_included'])
-            self.vat_preview.setVisible(values['vat_enabled'])
-            self.vat_preview.setText(f'Base: {cents_text(base)} · IVA: {cents_text(vat)} · Total: {cents_text(gross)} {currency}')
+            base_cop=convert_to_cop(base,currency,rate)
+            # Same order of conversion and rounding as persistence, including fractional USD cents.
+            entered_cop=convert_to_cop(total,currency,rate)
+            vat_cop=convert_to_cop(gross,currency,rate)-base_cop
+            gross_cop=base_cop+vat_cop
+            self.base_summary.setText(format_cop(base_cop));self.vat_summary.setText(format_cop(vat_cop))
+            self.total_summary.setText(format_cop(gross_cop)+' COP')
+            self.vat_caption.setText('IVA '+str(values['vat_rate']).replace('.',',')+' %' if values['vat_enabled'] else 'IVA · No aplica')
             prefix='≈ ' if total % quantity else ''
-            complement=(f'Costo por unidad: {prefix}{cents_text(unit)} {currency}'
-                        if self._mode=='total' else f'Costo total: {cents_text(total)} {currency}')
-            self.cost_preview.setText(complement+'\nSolo mercancía de este producto; gastos adicionales separados.')
+            def original_money(value):return ('US$ ' if currency=='USD' else '$ ')+format_cop(value).split('$ ',1)[1]
+            self.cost_preview.setText(('= '+prefix+original_money(unit)+' por unidad') if self._mode=='total' else '= '+original_money(total)+' en total')
+            base_unit=int((Decimal(base_cop)/quantity).quantize(Decimal('1'),rounding=ROUND_HALF_UP))
+            self.vat_preview.setText('Costo por unidad sin IVA: '+('≈ ' if base_cop%quantity else '')+format_cop(base_unit)+' COP')
+            self.exchange.conversion.setText(('Mercancía ingresada: ' if currency=='USD' else 'Importe en COP (la referencia no lo convierte): ')+format_cop(entered_cop)+' COP')
         except ValidationError:
-            self.vat_preview.setText('Revisa el importe y el porcentaje de IVA.')
+            for label in (self.base_summary,self.vat_summary,self.total_summary):label.setText('—')
+            self.vat_preview.setText('Completa el costo, la tasa de cambio y el IVA para ver el desglose.')
             self.cost_preview.setText('Ingresa el costo de la mercancía, sin los gastos adicionales.')
+            self.exchange.conversion.setText('')
 
     def accept_line(self):
         issues=[amount_issue(self.amount,self.amount_label.text())]

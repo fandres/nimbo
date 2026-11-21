@@ -12,6 +12,7 @@ from .ui.main_window import MainWindow
 from .backup_archive import BackupError
 from .backup_restore import recover_restore, apply_restore
 from .backup_preferences import BackupPreferences
+from .branding import app_icon
 from .version import APP_NAME, VERSION, DISPLAY_VERSION
 
 
@@ -21,6 +22,7 @@ def configure_identity(application: QApplication) -> None:
     application.setApplicationName('MiNegocio')
     application.setApplicationDisplayName(APP_NAME)
     application.setApplicationVersion(VERSION)
+    application.setWindowIcon(app_icon())
 
 
 def data_directory() -> Path:
@@ -33,6 +35,7 @@ def smoke_test() -> int:
     from PySide6.QtCore import QTimer
     application = QApplication.instance() or QApplication(sys.argv)
     configure_identity(application)
+    assert not application.windowIcon().pixmap(32,32).isNull(), "Missing bundled Nimbo icon"
     with TemporaryDirectory(prefix='nimbo-smoke-') as temporary:
         with DatabaseInstanceLock(Path(temporary) / 'smoke.sqlite3') as guard:
             repository = CatalogRepository(guard.database_path)

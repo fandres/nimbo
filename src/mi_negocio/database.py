@@ -81,9 +81,9 @@ def open_database(path: Path):
         connection.execute('PRAGMA foreign_keys=ON')
         connection.create_function('casefold',1,str.casefold,deterministic=True)
         version = connection.execute('PRAGMA user_version').fetchone()[0]
-        if version > 25:
+        if version > 29:
             raise StorageError('Esta base pertenece a una versión más reciente. Actualiza la aplicación.')
-        if version < 25:
+        if version < 29:
             if existing_data:
                 backup_database(connection,path)
             # One outer transaction covers every migration, including old catalog schemas.
@@ -180,6 +180,22 @@ def open_database(path: Path):
                 if connection.execute('PRAGMA user_version').fetchone()[0] == 24:
                     from .purchase_cost_rules import migrate_purchase_cost_rules
                     migrate_purchase_cost_rules(connection)
+                if connection.execute('PRAGMA user_version').fetchone()[0] == 25:
+                    columns = {r[1] for r in connection.execute('PRAGMA table_info(purchases)')}
+                    for name, declaration in [('invoice_vat_enabled', 'INTEGER NOT NULL DEFAULT 0'),
+                                              ('invoice_vat_rate', "TEXT NOT NULL DEFAULT '19'")]:
+                        if name not in columns:
+                            connection.execute(f'ALTER TABLE purchases ADD COLUMN {name} {declaration}')
+                    connection.execute('PRAGMA user_version=26')
+                if connection.execute('PRAGMA user_version').fetchone()[0] == 26:
+                    from .retention_certificates import migrate_certificates
+                    migrate_certificates(connection)
+                if connection.execute('PRAGMA user_version').fetchone()[0] == 27:
+                    from .retention_certificates import migrate_certificate_documents
+                    migrate_certificate_documents(connection)
+                if connection.execute('PRAGMA user_version').fetchone()[0] == 28:
+                    from .quick_entries import migrate_quick_entries
+                    migrate_quick_entries(connection)
         connection.execute('SELECT id,code FROM products LIMIT 0')
         return connection
     except (OSError, sqlite3.Error, StorageError) as error:

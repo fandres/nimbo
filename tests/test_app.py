@@ -82,7 +82,8 @@ def test_nimbo_name_preserves_storage_identity(qapp,tmp_path,monkeypatch):
     monkeypatch.setenv('XDG_DATA_HOME',str(tmp_path))
     app.configure_identity(qapp)
     assert qapp.applicationDisplayName()=='Nimbo'
-    assert qapp.applicationVersion()=='0.5.0b1'
+    assert not qapp.windowIcon().pixmap(32,32).isNull()
+    assert qapp.applicationVersion()=='0.6.0b2'
     root = Path(os.environ['APPDATA']) if sys.platform == 'win32' else tmp_path
     assert app.data_directory() == root / 'Fandres' / 'MiNegocio'
 

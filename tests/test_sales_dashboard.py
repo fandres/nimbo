@@ -21,7 +21,8 @@ def test_tabs_filters_ranking_and_actions(qtbot,tmp_path):
     button=next(b for b in page.table.cellWidget(0,7).findChildren(QPushButton) if b.text()=='Confirmar cobro')
     assert button.text()=='Confirmar cobro'
     qtbot.mouseClick(button,Qt.LeftButton)
-    assert page.dialog.sale_id==row['id'] and page.dialog.received.isChecked()
+    from mi_negocio.ui.receipt_dialog import ReceiptDialog
+    assert isinstance(page.dialog,ReceiptDialog) and page.dialog.sale['id']==row['id']
     assert not page.sales.get(row['id'])['received']
     page.dialog.reject();page.search.setText('no existe')
     assert page.dashboard.data['total']==0 and not page.rows

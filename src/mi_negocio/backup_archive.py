@@ -15,7 +15,7 @@ import zipfile
 from .version import VERSION
 from .storage import StorageError
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 29
 MAX_FILE = 2 * 1024**3
 MAX_TOTAL = 8 * 1024**3
 MAX_ENTRIES = 100000
@@ -84,9 +84,11 @@ def check_database(path):
             raise BackupError('La base del respaldo no supera la comprobación de integridad.')
         if db.execute("SELECT 1 FROM sqlite_master WHERE type IN ('trigger','view')").fetchone():
             raise BackupError('La base contiene objetos no admitidos por Nimbo.')
-        if version==SCHEMA_VERSION:
+        if version>=28:
             tables={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             for table,columns in expected_schema().items():
+                # Schema 29 only adds these independent draft tables.
+                if version==28 and table in ('quick_entries','quick_entry_settings'):continue
                 actual={c[1]:c[2].upper() for c in db.execute('PRAGMA table_info("'+table+'")')}
                 if table not in tables or any(actual.get(name)!=kind for name,kind in columns.items()):
                     raise BackupError('La estructura de la base está incompleta o no es compatible: '+table)

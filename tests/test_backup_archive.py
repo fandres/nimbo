@@ -70,7 +70,7 @@ def test_reject_incomplete_current_schema(tmp_path):
     db=sqlite3.connect(path)
     for statement in ['CREATE TABLE products(id,code)','CREATE TABLE sales(id)',
                       'CREATE TABLE purchases(id)','CREATE TABLE attachments(relative_path,removed_at)',
-                      'PRAGMA user_version=25']:db.execute(statement)
+                      'PRAGMA user_version=29']:db.execute(statement)
     db.commit()
     with pytest.raises(BackupError,match='estructura'):create_backup(db,tmp_path/'fake.zip',{})
     db.close()

@@ -37,6 +37,7 @@ class MoneyPage(QWidget):
         for i,title in enumerate(('DISPONIBLE HOY','ENTRADAS DEL PERÍODO','SALIDAS DEL PERÍODO','FLUJO NETO')):
             frame,content=card(title);label=note('—','sectionValue');label.setStyleSheet('font-size: 22px; font-weight: 700;');content.addWidget(label);metrics.addWidget(frame,0,i);self.metric_labels.append(label)
         box.addLayout(metrics);self.warning=note('');box.addWidget(self.warning)
+        self.configure_balances=QPushButton('Configurar saldos iniciales →');self.configure_balances.clicked.connect(lambda:self.tabs.setCurrentIndex(2));box.addWidget(self.configure_balances)
         middle=QHBoxLayout();frame,content=card('Flujo de caja neto');self.grouping=QComboBox();self.grouping.addItems(['Semanas','Meses']);content.addWidget(self.grouping);self.chart=MoneyChart();content.addWidget(self.chart);self.comparison=note('');content.addWidget(self.comparison);content.addWidget(note('Cobros y pagos reales; no representa utilidad.'));middle.addWidget(frame,3)
         frame,content=card('Tarjetas de crédito');self.debt=note('—','sectionValue');content.addWidget(self.debt);self.card_info=note('');content.addWidget(self.card_info);self.card_picker=QComboBox();content.addWidget(self.card_picker)
         actions=QHBoxLayout();self.review=QPushButton('Revisar tarjeta');self.pay=QPushButton('Pagar');self.pay.setObjectName('primary');actions.addWidget(self.review);actions.addWidget(self.pay);content.addLayout(actions);settings=QPushButton('Configurar tarjetas');settings.setObjectName('quietAction');content.addWidget(settings);content.addStretch();middle.addWidget(frame,2);box.addLayout(middle)
@@ -46,9 +47,10 @@ class MoneyPage(QWidget):
         self.export_status=note('');self.export_status.hide();m.addWidget(self.export_status)
         self.movements_table=table(['Fecha','Concepto','Cuenta','Entrada · COP','Salida · COP']);m.addWidget(self.movements_table,1)
         row=QHBoxLayout();self.filtered=note('');row.addWidget(self.filtered,1);self.view_button=QPushButton('Ver origen / detalle');self.cancel_button=QPushButton('Anular movimiento');self.cancel_button.setObjectName('removeAction');row.addWidget(self.view_button);row.addWidget(self.cancel_button);m.addLayout(row);self.tabs.addTab(movements,'Movimientos')
-        accounts=QWidget();a=QVBoxLayout(accounts);a.addWidget(note('El saldo inicial corresponde al comienzo del día. Las tarjetas se muestran como deuda, separadas del dinero disponible.'))
+        accounts=QWidget();a=QVBoxLayout(accounts);a.addWidget(note('Para calcular tu dinero, configura el saldo inicial de cada cuenta: cuánto había al comienzo de la fecha elegida (puede ser cero). Haz doble clic en la cuenta para configurarlo. Las tarjetas se muestran como deuda, separadas del disponible.'))
         self.accounts_table=table(['Cuenta','Tipo','Inicio','Saldo inicial · COP','Saldo actual / deuda · COP','Saldo al cierre · COP']);a.addWidget(self.accounts_table,1)
         row=QHBoxLayout();new=QPushButton('+ Nueva cuenta');opening=QPushButton('Configurar saldo inicial');history=QPushButton('Historial');setting_accounts=QPushButton('Editar cuentas en Configuración');row.addWidget(new);row.addWidget(opening);row.addWidget(history);row.addWidget(setting_accounts);a.addLayout(row);self.tabs.addTab(accounts,'Cuentas')
+        self.accounts_table.cellDoubleClicked.connect(self.open_account_balance)
         new.clicked.connect(self.new_account);opening.clicked.connect(self.opening);history.clicked.connect(self.account_history);setting_accounts.clicked.connect(self.open_settings.emit)
         self.review.clicked.connect(self.review_card);self.pay.clicked.connect(self.pay_card);settings.clicked.connect(self.open_settings.emit)
         self.view_button.clicked.connect(self.view_source);self.movements_table.cellDoubleClicked.connect(lambda *_:self.view_source());self.cancel_button.clicked.connect(self.cancel_entry)
@@ -92,6 +94,9 @@ class MoneyPage(QWidget):
             if account == -1:self.metric_labels[0].setText('No disponible · retenciones')
             self.metric_labels[3].setStyleSheet('font-size:22px;font-weight:700;color:'+('#168454' if result['net']>=0 else '#c63745')+';')
             self.warning.setText(('Saldo parcial: '+str(result['missing'])+' cuenta(s) sin saldo inicial. ' if result['missing'] else '')+(f"{result['unassigned']} pagos sin cuenta asignada: no se incluyen en el flujo. " if result['unassigned'] else '')+'Disponible hoy no cambia con el filtro de fechas.')
+            self.configure_balances.setVisible(bool(result['missing']))
+            self.warning.setStyleSheet('color:#875500;background:#fff3d6;padding:10px;border-radius:6px;' if result['missing'] else '')
+            self.warning.setToolTip('Configura el saldo inicial de cada cuenta en Dinero → Cuentas. Indica cuánto había al comienzo de la fecha elegida; puede ser cero. Las cuentas sin configurar no se incluyen en el disponible.')
             self.chart.set_rows(result['flow'],start,end,self.grouping.currentIndex()==1)
             ps,pe=comparison_period(start,end,monthly);previous=self.repository.summary(ps,pe,account)
             self.comparison.setText(f"Entradas: {change_text(result['incoming'],previous['incoming'])} · Salidas: {change_text(result['outgoing'],previous['outgoing'])}\nComparación: {ps:%d/%m/%Y} – {pe:%d/%m/%Y}")
@@ -124,7 +129,13 @@ class MoneyPage(QWidget):
                 closed = closing[a['id']]
                 closing_text = format_cop(-closed['balance_cents'] if a['is_card'] else closed['balance_cents']) if closed['configured'] else 'Sin configurar'
                 for j,text in enumerate((a['name'],'Tarjeta · deuda' if a['is_card'] else 'Efectivo' if a['kind']=='cash' else 'Retención · no disponible' if a['kind']=='withholding' else 'Banco / billetera','Automático' if a['kind']=='withholding' else a['opened_on'] or 'Por configurar',format_cop(abs(a['opening_cents']) if a['is_card'] else a['opening_cents']) if a['opening_cents'] is not None else '—',current,closing_text)):
-                    self.accounts_table.setItem(i,j,QTableWidgetItem(text))
+                    item=QTableWidgetItem(text)
+                    if not a['configured']:
+                        item.setBackground(QColor('#fff3d6'));item.setForeground(QColor('#875500'))
+                        item.setToolTip('Falta configurar el saldo inicial para calcular el dinero de esta cuenta. Haz doble clic en esta fila o pulsa Configurar saldo inicial. Indica el saldo al comienzo del día elegido; puede ser cero.' if not a['opened_on'] else 'La fecha de inicio de esta cuenta es futura. Su saldo aún no se incluye. Haz doble clic para revisar el saldo inicial y la fecha.')
+                    elif j==5 and not closed['configured']:
+                        item.setToolTip('La fecha de cierre es anterior al saldo inicial de esta cuenta.')
+                    self.accounts_table.setItem(i,j,item)
             self.error.clear();self.error.hide()
         except (StorageError,ValidationError) as e:self.error.setText(error_text(e));self.error.show()
     def watch(self,dialog,signal='saved'):
@@ -132,6 +143,11 @@ class MoneyPage(QWidget):
     def updated(self):self.refresh();self.changed.emit()
     def new_entry(self,kind='contribution',card_account=None,purchase_id=None):self.watch(MoneyEntryDialog(self.repository,self,kind,card_account,purchase_id))
     def new_account(self):self.watch(AccountDialog(self.repository.connection,self))
+    def open_account_balance(self,row,column):
+        if 0<=row<len(self.accounts) and self.accounts[row]['kind']!='withholding':
+            self.accounts_table.setCurrentCell(row,column)
+            self.opening()
+
     def opening(self):
         row=self.accounts_table.currentRow()
         if row<0:self.error.setText('Selecciona una cuenta para configurar su saldo inicial.');self.error.show();return

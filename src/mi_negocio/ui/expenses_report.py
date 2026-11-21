@@ -1,6 +1,7 @@
 """Read-only expense document from a single filtered snapshot."""
 from datetime import date, datetime
 from html import escape
+from .report_format import filter_description
 from .style import format_cop
 
 
@@ -28,19 +29,20 @@ def build_expenses_report(rows, filters, date_basis='spent'):
         values = [date.fromisoformat(day).strftime('%d/%m/%Y') if day else '—', concept,
                   escape(r['category']), escape(r['account']), state, format_cop(r['amount_cents'])]
         detail.append('<tr>'+''.join(f'<td{chr(32)+"align=right" if i==5 else ""}>{v}</td>' for i,v in enumerate(values))+'</tr>')
-    metadata = '<br>'.join(f'<b>{escape(k)}:</b> {escape(v)}' for k,v in filters)
+    metadata = filter_description(filters)
     estimated = 'Incluye comisiones estimadas.' if any(r.get('estimated') for r in active) else ''
     return f'''<html><head><style>
-    body {{font-family:sans-serif;font-size:9pt;color:#162e50;}}
-    h1 {{color:#2458da;font-size:22pt;}} h2 {{font-size:12pt;}}
+    body {{font-family:sans-serif;font-size:10pt;color:#162e50;}}
+    h1 {{color:#2458da;font-size:22pt;}} h2 {{font-size:14pt;}}
     th {{background:#eaf0ff;}} td {{border-bottom:1px solid #e3e8f0;}}
     .muted {{color:#64748b;}}
+    .metric b {{font-size:16pt;}}
     </style></head><body><h1>Nimbo · Informe de gastos</h1>
     <p>{metadata}<br><span class="muted">Generado: {datetime.now():%d/%m/%Y %H:%M} · Moneda: COP</span></p>
     <table width="100%" cellspacing="0" cellpadding="9"><tr>
-    <td bgcolor="#eaf0ff">Total vigente<br><b>{format_cop(total)}</b></td>
-    <td bgcolor="#e6f5ed">Pagado / cargado a tarjeta<br><b>{format_cop(paid)}</b></td>
-    <td bgcolor="#fff2e5">Pendiente<br><b>{format_cop(total-paid)}</b></td></tr></table>
+    <td class="metric" style="color:#162e50" bgcolor="#f6f8fd">Total vigente<br><b>{format_cop(total)}</b></td>
+    <td class="metric" style="color:#127143" bgcolor="#f6f8fd">Pagado / cargado a tarjeta<br><b>{format_cop(paid)}</b></td>
+    <td class="metric" style="color:#925900" bgcolor="#f6f8fd">Pendiente<br><b>{format_cop(total-paid)}</b></td></tr></table>
     <p class="muted">{estimated} Los anulados no suman. Los cargos a tarjeta son deuda, no salida de efectivo.
     El capital de préstamos no es gasto; se incluyen sus intereses registrados.
     Comisiones y envíos procedentes de ventas se incluyen una sola vez.</p>

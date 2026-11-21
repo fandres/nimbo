@@ -31,18 +31,19 @@ def build_profitability_report(snapshot, start, end):
     else:
         warning = 'Resultado calculado con los costos registrados. Las correcciones de compras actualizan este informe.'
     return f'''<html><head><style>
-    body {{font-family:sans-serif;font-size:9pt;color:#162e50;}}
-    h1 {{color:#2458da;font-size:22pt;}} h2 {{font-size:12pt;}}
+    body {{font-family:sans-serif;font-size:10pt;color:#162e50;}}
+    h1 {{color:#2458da;font-size:22pt;}} h2 {{font-size:14pt;}}
     th {{background:#eaf0ff;}} td {{border-bottom:1px solid #e3e8f0;}}
     .muted {{color:#64748b;}}
-    </style></head><body><h1>Nimbo · Rentabilidad</h1>
+    .metric b {{font-size:16pt;}}
+        </style></head><body><h1>Nimbo · Rentabilidad</h1>
     <p><b>Período:</b> {start:%d/%m/%Y} al {end:%d/%m/%Y}<br>
     <b>Búsqueda:</b> {escape(snapshot['query'] or 'Todas las ventas vigentes')}<br>
     <span class="muted">Generado: {datetime.now():%d/%m/%Y %H:%M} · COP · Valoración FIFO</span></p>
     <table width="100%" cellspacing="0" cellpadding="10"><tr>
-    <td bgcolor="#eaf0ff">Ingresos sin IVA de venta<br><b>{amount(snapshot['income_cents'])}</b></td>
-    <td bgcolor="#fff2e5">Costo de mercancía conocido{' · parcial' if snapshot['unknown_count'] else ''}<br><b>{amount(snapshot['known_cost_cents'])}</b></td>
-    <td bgcolor="#e6f5ed">Margen tras mercancía, comisión y envío<br><b>{amount(snapshot['margin_cents'])}</b></td></tr></table>
+    <td class="metric" style="color:#162e50" bgcolor="#f6f8fd">Ingresos sin IVA de venta<br><b>{amount(snapshot['income_cents'])}</b></td>
+    <td class="metric" style="color:#925900" bgcolor="#f6f8fd">Costo de mercancía conocido{' · parcial' if snapshot['unknown_count'] else ''}<br><b>{amount(snapshot['known_cost_cents'])}</b></td>
+    <td class="metric" style="color:#127143" bgcolor="#f6f8fd">Margen tras mercancía, comisión y envío<br><b>{amount(snapshot['margin_cents'])}</b></td></tr></table>
     <p style="color:#a35d00">{warning}</p>
     <table width="100%" cellspacing="0" cellpadding="7"><tr>
     <td>Comisiones: <b>{amount(snapshot['commission_cents'])}</b><br>Envíos: <b>{amount(snapshot['shipping_cents'])}</b></td>

@@ -6,14 +6,17 @@ from dataclasses import replace
 import json
 from ..purchase_concepts import PurchaseConceptsRepository
 from ..purchase_cost_rules import PurchaseCostRules
-from ..purchases import categories_for, check_duplicate_vat, is_vat_cost
+from ..purchases import categories_for, check_duplicate_vat, is_vat_cost, cost_states_complete
 from decimal import Decimal
 from uuid import uuid4
-from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtCore import Qt, Signal, QDate, QSignalBlocker
 from PySide6.QtWidgets import (QDialog, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLineEdit, QComboBox, QPushButton, QScrollArea, QCompleter, QTableWidgetItem,
     QMessageBox, QInputDialog, QTextEdit)
-from .form_validation import required_reason, check, required
+from .form_validation import required_reason, check, required, rate_issue
+from .preferences import DisplayPreferences
+from .sales_widgets import ToggleSwitch, AmountEdit
+from ..purchases import apply_invoice_vat, line_base_cop
 from ..purchases import (PurchaseDraft, PurchaseLineInput, PurchaseCostInput,
                         calculate_purchase_totals, convert_to_cop, preview_purchase_totals, line_original_total)
 from ..storage import StorageError
@@ -90,12 +93,25 @@ class PurchaseDialog(QDialog):
         fields.setColumnStretch(0,3);fields.setColumnStretch(1,2);fields.setColumnStretch(3,2);header.addLayout(fields); body.addWidget(self.header)
         self.grid=QGridLayout(); self.grid.setSpacing(12); body.addLayout(self.grid,1); self._compact=None
         self.products_panel,products=section('2 · Qué compramos')
-        products.addWidget(note('Costos de compra y cantidades; todavía no son existencias disponibles.'))
+        self.products_panel.setToolTip('Costos de compra y cantidades; todavía no son existencias disponibles.')
         self.lines_table=table(['Producto','Cant.','Compra/u\nCOP','Con gastos\npor unidad\nCOP','Total\nmercancía\nCOP']); products.addWidget(self.lines_table,1)
         self.products_total=note('Total de productos: $ 0,00','summaryAmount')
         self.products_total.setStyleSheet('background: #eaf0ff; color: #162e50; padding: 10px; border-radius: 10px; font-weight: 700;')
         self.products_total.setToolTip('Suma de la mercancía agregada al formulario, sin gastos adicionales. No requiere guardar.')
         products.addWidget(self.products_total)
+        iva_row=QHBoxLayout()
+        self.invoice_vat_enabled=ToggleSwitch('')
+        self.invoice_vat_enabled.setAccessibleName('Separar IVA del total')
+        iva_row.addWidget(self.invoice_vat_enabled)
+        iva_row.addWidget(note('Separar IVA del total'))
+        self.invoice_vat_rate=AmountEdit(str(DisplayPreferences().purchase_vat_rate()))
+        self.invoice_vat_rate.setMaximumWidth(76)
+        self.invoice_vat_rate.setStyleSheet('padding: 3px 8px;')
+        self.invoice_vat_rate.setAccessibleName('Tarifa de IVA del total')
+        iva_row.addWidget(self.invoice_vat_rate);iva_row.addWidget(note('%'));iva_row.addStretch()
+        products.addLayout(iva_row)
+        self.invoice_vat_summary=self.products_total
+        self.invoice_vat_enabled.setToolTip('El total de mercancía ingresado ya incluye IVA. Se separa la base sin aumentar el total. No se combina con IVA por producto.')
         buttons=QHBoxLayout(); self.add_line=QPushButton('+ Agregar producto'); self.add_line.setObjectName('secondaryAction')
         self.edit_line=QPushButton('Editar'); self.remove_line=QPushButton('Quitar')
         for b in (self.add_line,self.edit_line,self.remove_line): buttons.addWidget(b)
@@ -106,7 +122,7 @@ class PurchaseDialog(QDialog):
         cost_heading=QHBoxLayout();cost_heading.addWidget(costs.takeAt(0).widget(),1);cost_heading.addWidget(self.update_concepts_button);costs.insertLayout(0,cost_heading)
         self.concepts_notice=note('');self.concepts_notice.hide();costs.addWidget(self.concepts_notice)
         self.progress_editor=PurchaseProgressEditor(inline=True,categories=self.categories)
-        self.progress_editor.set_states({key:'pending' for key in self.categories},False)
+        self.progress_editor.set_states({key:'unselected' for key in self.categories},False)
         costs.addWidget(self.progress_editor)
         self.cost_editor=PurchaseCostEditor(categories=self.categories); self.cost_editor.bind_progress(self.progress_editor)
         self.cost_editor.validate_candidate=self.validate_cost_candidate
@@ -139,6 +155,8 @@ class PurchaseDialog(QDialog):
         self.cost_editor.changed.connect(self.refresh_summary); self.progress_editor.changed.connect(self.refresh_summary)
         self.purchased_on.dateChanged.connect(self.refresh_summary); self.supplier.textChanged.connect(self.refresh_summary)
         self.cancel_purchase.clicked.connect(self.cancel_record); self.history_button.clicked.connect(self.show_history); self.reload_button.clicked.connect(self.reload)
+        self.invoice_vat_enabled.toggled.connect(self.toggle_invoice_vat)
+        self.invoice_vat_rate.textChanged.connect(self.refresh_summary)
         self._arrange(self.width()<1050)
         if purchase_id: self.load()
         else: self.refresh_summary()
@@ -157,6 +175,10 @@ class PurchaseDialog(QDialog):
     def resizeEvent(self,event):
         super().resizeEvent(event)
         self.layout().setSpacing(4 if self.height()<800 else 6)
+        if hasattr(self,'costs_panel'):
+            padding=5 if self.height()<800 else 8
+            for panel in (self.header,self.products_panel,self.costs_panel):
+                panel.layout().setContentsMargins(12,padding,12,padding)
         if hasattr(self,'summary_grid'): self._arrange(self.width()<1050)
 
     def select_supplier(self,text):
@@ -165,7 +187,7 @@ class PurchaseDialog(QDialog):
             self.supplier.setText(name);self.supplier_alias.setText(alias)
 
     def covered_vat_categories(self):
-        if not any(line.vat_enabled for line in self.lines):return set()
+        if not self.invoice_vat_enabled.isChecked() and not any(line.vat_enabled for line in self.lines):return set()
         used={cost.category for cost in self.cost_editor.costs()}
         return {key for key,name in self.categories.items() if is_vat_cost(name) and key not in used}
 
@@ -175,15 +197,29 @@ class PurchaseDialog(QDialog):
         else:costs[index]=cost
         check_duplicate_vat(replace(self.draft(),costs=tuple(costs)))
 
+    def toggle_invoice_vat(self,enabled):
+        if enabled:
+            try:check_duplicate_vat(self.draft())
+            except ValidationError as exc:
+                with QSignalBlocker(self.invoice_vat_enabled):self.invoice_vat_enabled.setChecked(False)
+                self.error.setText(error_text(exc))
+                self.refresh_summary()
+                return
+        self.error.clear()
+        self.refresh_summary()
+
     def draft(self):
         states=self.progress_editor.states()
         if states is not None:
             states={**states,**{key:'not_applicable' for key in self.covered_vat_categories()}}
-        complete=all(value!='pending' for value in states.values()) if states is not None else self.progress_editor.is_complete()
+        complete=cost_states_complete(states) if states is not None else self.progress_editor.is_complete()
         return PurchaseDraft(self.purchased_on.date().toPython(),self.supplier.text().strip(),self.reference.text().strip(),
-                             tuple(self.lines),self.cost_editor.costs(),complete,states,self.cost_definitions,self.supplier_alias.text().strip(),self.tracking.text().strip())
+                             tuple(self.lines),self.cost_editor.costs(),complete,states,self.cost_definitions,self.supplier_alias.text().strip(),self.tracking.text().strip(),
+                             self.invoice_vat_enabled.isChecked(),
+                             (Decimal('NaN') if self.invoice_vat_enabled.isChecked() else Decimal('19')) if rate_issue(self.invoice_vat_rate,'IVA',100) else Decimal(self.invoice_vat_rate.text().replace(',','.')))
 
     def refresh_summary(self,*args):
+        self.invoice_vat_rate.setEnabled(self.invoice_vat_enabled.isChecked())
         self.cost_editor.setEnabled(bool(self.lines))
         self.cost_editor.description.setVisible(not self.lines)
         self.cost_editor.description.setText('Agrega los productos para determinar los costos adicionales aplicables.')
@@ -198,7 +234,7 @@ class PurchaseDialog(QDialog):
         self.distribute_costs.setText(
             'Reparto automático · mismo modelo' if automatic else 'Distribuir costos entre productos')
         try:
-            normalized = automatic_allocations(self.draft())
+            normalized = automatic_allocations(apply_invoice_vat(self.draft()))
             if tuple(self.lines) != normalized.lines:
                 self.lines = list(normalized.lines)
                 self._render_lines()
@@ -208,13 +244,17 @@ class PurchaseDialog(QDialog):
         complete=draft.costs_complete
         states=draft.cost_states
         covered=self.covered_vat_categories()
-        self.cost_editor.blocked_categories={key for key,name in self.categories.items() if is_vat_cost(name)} if any(line.vat_enabled for line in self.lines) else set()
+        self.cost_editor.blocked_categories={key for key,name in self.categories.items() if is_vat_cost(name)} if self.invoice_vat_enabled.isChecked() or any(line.vat_enabled for line in self.lines) else set()
         for row,key in enumerate(self.cost_editor.row_categories):
             self.cost_editor.table.setRowHidden(row,key in covered)
         self.progress_editor.setVisible(states is None)
         pending=', '.join(self.categories[key] for key,value in (states or {}).items() if value=='pending')
+        unselected=', '.join(self.categories[key] for key,value in (states or {}).items() if value=='unselected')
+        details=[]
+        if pending:details.append('Pendiente: '+pending)
+        if unselected:details.append('Sin seleccionar: '+unselected)
         self.status_hint.setText('Costos completos · no registra pagos ni movimientos de inventario.' if complete else
-                                'Provisional · Pendiente: '+(pending or 'revisar conceptos pendientes'))
+                                'Provisional · '+(' · '.join(details) or 'revisar conceptos pendientes'))
         try:
             summary=allocation_summary(self.draft())
             self.allocation_note.setText('Gastos asignados: '+format_cop(sum(summary['assigned'].values()))+
@@ -224,6 +264,10 @@ class PurchaseDialog(QDialog):
                 for key,value in summary['remaining'].items()))
             totals=preview_purchase_totals(self.draft())
             self.products_total.setText('Total de productos (base): '+format_cop(totals.merchandise_cents) if totals.vat_cents else 'Total de productos: '+format_cop(totals.merchandise_cents))
+            if self.invoice_vat_enabled.isChecked():
+                self.products_total.setText('Base: '+format_cop(totals.merchandise_cents)+' · IVA: '+format_cop(totals.vat_cents))
+                self.products_total.setToolTip('Mercancía con IVA incluido: '+format_cop(totals.merchandise_cents+totals.vat_cents))
+            else:self.products_total.setToolTip('Total de mercancía, sin gastos adicionales.')
             self.vat_note.setVisible(any(line.vat_enabled for line in self.lines))
             self.vat_note.setText('IVA de productos: '+format_cop(totals.vat_cents)+' · Incluido en Impuestos y otros. IVA de factura bloqueado mientras haya IVA por producto.')
             if complete and not summary['complete']:
@@ -231,6 +275,7 @@ class PurchaseDialog(QDialog):
             for label,value in zip(self.summary_labels,(totals.merchandise_cents,totals.shipping_import_cents,totals.taxes_other_cents,totals.total_cents)):
                 label.setText(format_cop(value))
         except ValidationError as error:
+            self.invoice_vat_summary.setText('Revisa la tarifa o los importes del IVA.')
             self.vat_note.show();self.vat_note.setText(error_text(error))
             self.products_total.setText('Total de productos: revisa los importes')
             for label in self.summary_labels: label.setText('Revisa los importes' if self.lines else '—')
@@ -249,7 +294,7 @@ class PurchaseDialog(QDialog):
             from decimal import ROUND_HALF_UP
             values=[name,str(line.quantity),prefix+format_cop(int(units['purchase_cents'].quantize(Decimal('1'),rounding=ROUND_HALF_UP))),
                     prefix+format_cop(int(units['landed_cents'].quantize(Decimal('1'),rounding=ROUND_HALF_UP))),
-                    format_cop(convert_to_cop(line_original_total(line),line.currency,line.exchange_rate))]
+                    format_cop(line_base_cop(line))]
             for j,text in enumerate(values):
                 item=QTableWidgetItem(text); item.setToolTip(text); self.lines_table.setItem(i,j,item)
 
@@ -267,6 +312,10 @@ class PurchaseDialog(QDialog):
                 else:lines[index]=candidate
                 check_duplicate_vat(replace(self.draft(),lines=tuple(lines)))
             dialog.validate_candidate=validate_line
+            if self.invoice_vat_enabled.isChecked():
+                dialog.vat.enabled.setChecked(False)
+                dialog.vat.enabled.setEnabled(False)
+                dialog.vat.setToolTip('El IVA se está separando del total del pedido. Desactiva esa opción antes de usar IVA por producto.')
             if any(is_vat_cost(self.categories.get(cost.category,''),cost.description) and cost.amount_cents for cost in self.cost_editor.costs()):
                 dialog.error.setText('Ya hay IVA de factura en Costos adicionales. Quítalo antes de aplicar IVA por producto.')
                 if line is None or not line.vat_enabled:
@@ -329,9 +378,9 @@ class PurchaseDialog(QDialog):
         if definitions!=self.cost_definitions:
             if old_states is None:
                 complete=self.progress_editor.is_complete()
-                old_states={key:('recorded' if key in used else 'not_applicable') if complete else 'pending' for key in self.categories}
-            states={key:old_states.get(key,'pending') for key in definitions}
-            self._set_concepts(definitions,states,all(v!='pending' for v in states.values()))
+                old_states={key:('recorded' if key in used else 'not_applicable') if complete else ('recorded' if key in used else 'unselected') for key in self.categories}
+            states={key:old_states.get(key,'unselected') for key in definitions}
+            self._set_concepts(definitions,states,cost_states_complete(states))
         if kept:
             self.concepts_notice.setText('Se conservan costos con importes o asignaciones que ya no aplican: '+', '.join(self.categories.get(key,key) for key in sorted(kept))+'. Revisa antes de guardar.')
         elif explicit:
@@ -348,6 +397,9 @@ class PurchaseDialog(QDialog):
         row=self.purchases.get(self.purchase_id); self.revision=row['revision']; self.record=row
         if self.cost_definitions!=row['cost_definitions']:
             self._set_concepts(row['cost_definitions'],row.get('cost_states'),bool(row['costs_complete']))
+        with QSignalBlocker(self.invoice_vat_enabled), QSignalBlocker(self.invoice_vat_rate):
+            self.invoice_vat_enabled.setChecked(bool(row.get('invoice_vat_enabled',False)))
+            self.invoice_vat_rate.setText(row.get('invoice_vat_rate','19'))
         self.concepts_notice.hide()
         self.tracking.setText(row.get('tracking_number',''))
         self.supplier.setText(row['supplier']);self.supplier_alias.setText(row.get('supplier_alias','')); self.reference.setText(row['reference'])
@@ -358,6 +410,7 @@ class PurchaseDialog(QDialog):
             self.lines.append(PurchaseLineInput(r['product_id'],r['quantity'],r['unit_cost_cents'],r['currency'],
                 Decimal(r['exchange_rate']) if r['exchange_rate'] is not None else None,
                 date.fromisoformat(r['converted_on']) if r['converted_on'] else None,r['id'],
+                invoice_vat_share_cents=r.get('vat_cents',0) if row.get('invoice_vat_enabled') else None,
                 vat_enabled=bool(r.get('vat_enabled',False)),vat_rate=Decimal(r.get('vat_rate','19')),vat_included=bool(r.get('vat_included',False)),total_cost_cents=r.get('total_cost_cents'),extra_allocations=json.loads(r.get('extra_allocations_json') or '{}'), **{field:r.get(field,0) for field in ALLOCATION_FIELDS.values()}))
             self.names[r['id']]=r['code']+' · '+r['name']
         self._automatic_allocation_active = bool(self.lines) and len({line.product_id for line in self.lines}) == 1
@@ -376,6 +429,7 @@ class PurchaseDialog(QDialog):
 
     def save(self):
         issues=[required(self.supplier,'el proveedor')]
+        if self.invoice_vat_enabled.isChecked():issues.append(rate_issue(self.invoice_vat_rate,'IVA',100))
         if not self.lines:issues.append((self.add_line,'Agrega al menos un producto a la compra.'))
         if not check(self,issues,self.error):return
         self.save_button.setEnabled(False)
@@ -435,7 +489,7 @@ class PurchaseDialog(QDialog):
                     lines.append('  '+historic.get(key,key)+': '+format_cop(value))
             historic={k:v['name'] for k,v in snapshot.get('cost_definitions',self.cost_definitions).items()}
             states=snapshot.get('cost_states')
-            labels={'pending':'Pendiente','recorded':'Registrado','not_applicable':'No aplica'}
+            labels={'unselected':'Sin seleccionar','pending':'Pendiente','recorded':'Registrado','not_applicable':'No aplica'}
             lines.append('Conceptos: '+(', '.join(historic.get(key,key)+': '+labels[value] for key,value in states.items()) if states else 'Seguimiento no registrado'))
             for item in snapshot['costs']:
                 lines.append(f"{historic.get(item['category'],item['category'])}: {format_cop(item['subtotal_cents'])} COP · {item['description']}")

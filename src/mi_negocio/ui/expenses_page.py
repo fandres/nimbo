@@ -2,7 +2,7 @@
 from .attachments_dialog import attachment_button, with_attachment
 from dataclasses import replace
 from decimal import Decimal,ROUND_HALF_UP
-from PySide6.QtCore import Signal,Qt
+from PySide6.QtCore import Signal,Qt,QDate
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget,QFrame,QVBoxLayout,QHBoxLayout,QGridLayout,QPushButton,QLineEdit,QComboBox,QTabWidget,QHeaderView,QTableWidgetItem,QProgressBar,QSizePolicy
 from ..expenses import ExpenseFilter,comparison_period
@@ -29,6 +29,8 @@ def change_text(current,previous):
     return f'{value:+f} %'.replace('.',',')
 
 
+from .quick_entry_dialog import QuickEntryDialog, PendingEntries, quick_button
+
 class ExpensesPage(QWidget):
     changed=Signal()
     open_sale=Signal(int)
@@ -37,6 +39,7 @@ class ExpensesPage(QWidget):
         super().__init__(parent);self.repository=repository;self.settings=settings;self.dialog=None;self.rows=[];self.summary_data={};self.filtered_summary={}
         root=QVBoxLayout(self);root.setContentsMargins(24,18,24,14);root.setSpacing(10)
         header=QHBoxLayout();header.addWidget(note('Gastos','heading'));header.addWidget(note('Controla en qué se va tu dinero.'),1)
+        self.quick=quick_button();header.addWidget(self.quick);self.quick.clicked.connect(lambda:self.open_quick())
         self.new_button=QPushButton('+ Nuevo gasto');self.new_button.setObjectName('primary');self.new_button.clicked.connect(self.open_new_expense);header.addWidget(self.new_button);root.addLayout(header)
         self.tabs=QTabWidget();self.tabs.setObjectName('expensesTabs');root.addWidget(self.tabs,1)
         self.summary_page=QWidget();self.movements_page=QWidget();self.loans=LoansPage(LoansRepository(repository.connection),settings)
@@ -78,6 +81,7 @@ class ExpensesPage(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
         for col,width in [(0,100),(2,160),(3,115),(4,95),(5,150),(6,155)]:self.table.horizontalHeader().setSectionResizeMode(col,QHeaderView.Fixed);self.table.setColumnWidth(col,width)
         self.table.verticalHeader().setDefaultSectionSize(76);movements.addWidget(self.table,1);self.count=note('');movements.addWidget(self.count)
+        self.quick_pending=PendingEntries(repository.connection,'expenses');movements.addWidget(self.quick_pending);self.quick_pending.open_requested.connect(self.open_quick)
         self.table.cellDoubleClicked.connect(self.open_selected)
         self.error=note('','error');root.addWidget(self.error)
         self.tabs.currentChanged.connect(self._tab_changed)
@@ -112,6 +116,7 @@ class ExpensesPage(QWidget):
 
     def refresh(self,*args):
         try:
+            self.quick_pending.refresh()
             start,end,monthly=self.period.period();before_start,before_end=comparison_period(start,end,monthly)
             basic=ExpenseFilter(start,end,self.account.currentData(),method_id=self.platform.currentData(),date_basis=self.date_basis.currentData())
             self.more.setText('Más filtros'+(' · '+str(int(basic.method_id is not None)+int(basic.date_basis=='paid')) if basic.method_id is not None or basic.date_basis=='paid' else ''))
@@ -198,6 +203,21 @@ class ExpensesPage(QWidget):
             from .credit_card_dialogs import CardDetailDialog
             self.card_dialog=CardDetailDialog(CreditCardsRepository(self.repository.connection),row['source_id'],self);self.card_dialog.changed.connect(self._saved);self.card_dialog.show();return
         self._open_dialog(row['source_id'],mark_paid)
+    def show_period(self,start,end,pending=False):
+        controls=(self.search,self.category,self.state,self.account,self.validity,self.platform,self.date_basis,self.period.custom,self.period.start,self.period.end)
+        for control in controls:control.blockSignals(True)
+        self.search.clear()
+        for combo in (self.category,self.account,self.validity,self.platform,self.date_basis):combo.setCurrentIndex(0)
+        self.state.setCurrentIndex(self.state.findData(False) if pending else 0)
+        self.period.custom.setChecked(True);self.period.start.setDate(QDate(start.year,start.month,start.day));self.period.end.setDate(QDate(end.year,end.month,end.day))
+        for control in controls:control.blockSignals(False)
+        self.period._update();self.tabs.setCurrentIndex(1);self.refresh()
+
+    def open_quick(self,entry_id=None):
+        if self.dialog and self.dialog.isVisible():self.dialog.raise_();return
+        self.dialog=QuickEntryDialog(self.repository.connection,'expenses',self.window(),entry_id=entry_id)
+        self.dialog.saved.connect(self._saved);self.dialog.show()
+
     def open_new_expense(self):self._open_dialog()
     def _open_dialog(self,key=None,mark_paid=False):
         if self.dialog and self.dialog.isVisible():self.dialog.raise_();return

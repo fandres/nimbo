@@ -1,8 +1,9 @@
 from pathlib import Path
+from ..branding import app_icon
 from ..storage import StorageError
 from ..version import APP_NAME, DISPLAY_VERSION
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt,QDate,QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame,
@@ -26,6 +27,7 @@ class MainWindow(QMainWindow):
     def __init__(self, repository, logo_path: Path | None = None, preferences=None):
         super().__init__()
         self.setWindowTitle(APP_NAME + ' · Inicio')
+        self.setWindowIcon(app_icon())
         available = self.screen().availableGeometry()
         self.resize(min(1440, max(800, available.width() - 24)),
                     min(900, max(560, available.height() - 48)))
@@ -46,9 +48,10 @@ class MainWindow(QMainWindow):
             label = QLabel()
             label.setPixmap(logo.scaled(112, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            label = QLabel('m')
-            label.setObjectName('brandMark')
-            label.setFixedSize(42, 42)
+            label = QLabel()
+            label.setAccessibleName('Nimbo')
+            label.setPixmap(app_icon().pixmap(56,56))
+            label.setFixedSize(56,56)
             label.setAlignment(Qt.AlignCenter)
         side.addWidget(label, alignment=Qt.AlignHCenter)
         brand = QLabel('Mi negocio')
@@ -160,6 +163,15 @@ class MainWindow(QMainWindow):
             signal.connect(self.money_page.refresh)
         self.settings_page.settings_changed.connect(self.home_page.refresh_summary)
         self.home_page.open_catalog.connect(lambda: self.navigate('catalog'))
+        self.home_page.sales_period_requested.connect(self.open_home_sales)
+        self.home_page.all_sales_requested.connect(lambda:self.open_home_sales(None,None))
+        self.home_page.expenses_period_requested.connect(self.open_home_expenses)
+        self.home_page.pending_expenses_requested.connect(self.open_home_unpaid)
+        self.home_page.money_requested.connect(self.open_home_money)
+        self.home_page.accounts_requested.connect(self.open_home_accounts)
+        self.home_page.sale_requested.connect(self.sales_page.open_sale_detail)
+        self.expenses_page.changed.connect(self.home_page.refresh_summary)
+
         from .reports_page import ReportsPage
         self.reports_page = ReportsPage(repository.connection, self)
         self.pages.addWidget(self.reports_page)
@@ -209,11 +221,32 @@ class MainWindow(QMainWindow):
         except StorageError as error:self.expenses_page.error.setText(str(error))
 
     def offer_inventory_setup(self):
-        from ..storage import StorageError
         try:
             if not self.inventory_page.repository.state()['initialized']:
                 self.navigate('inventory')
         except StorageError as error:self.show_sale_error(str(error))
+
+    def open_home_sales(self,start,end):
+        self.navigate('sales');self.sales_page.show_period(start,end)
+
+    def open_home_expenses(self,start,end):
+        self.navigate('expenses');self.expenses_page.show_period(start,end)
+
+    def open_home_unpaid(self):
+        from datetime import date
+        self.navigate('expenses');self.expenses_page.show_period(date(1900,1,1),date.today(),pending=True)
+
+    def open_home_money(self):
+        self.navigate('money');page=self.money_page;today=QDate.currentDate()
+        controls=(page.account_filter,page.period.custom,page.period.start,page.period.end)
+        for control in controls:control.blockSignals(True)
+        page.account_filter.setCurrentIndex(0);page.period.custom.setChecked(True)
+        page.period.start.setDate(QDate(today.year(),today.month(),1));page.period.end.setDate(today)
+        for control in controls:control.blockSignals(False)
+        page.tabs.setCurrentIndex(0);page.period._update()
+
+    def open_home_accounts(self):
+        self.open_home_money();self.money_page.tabs.setCurrentIndex(2)
 
     def open_pending(self):
         self.navigate('sales')
@@ -224,3 +257,4 @@ class MainWindow(QMainWindow):
             self.home_page.error_label.setText(message)
             self.home_page.error_label.show()
             self.home_page.retry_button.show()
+            QTimer.singleShot(0,lambda:self.home_page.scroll.ensureWidgetVisible(self.home_page.error_label))

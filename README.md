@@ -11,7 +11,7 @@ Funciona con datos locales, sin depender de un servicio en la nube. Está escrit
 en **Python y Qt / PySide6**, utiliza **SQLite** y su código se distribuye bajo
 licencia **MIT**.
 
-> **0.5.0-beta.1 · Primera beta.** Está disponible para evaluación. Haz una copia
+> **0.6.0-beta.2 · Segunda beta.** Está disponible para evaluación. Haz una copia
 > de seguridad antes de actualizar y prueba tus operaciones habituales antes de
 > utilizarla con registros definitivos.
 
@@ -24,18 +24,25 @@ ficticios. La aplicación comienza sin esos registros.
 
 | Área | Funciones |
 | --- | --- |
-| **Ventas** | Registrar productos y servicios, clientes, cobros pendientes, comisiones, envíos, IVA y retenciones. Consultar gráficos y filtrar movimientos. |
+| **Ventas** | Registrar productos y servicios, clientes, cobros pendientes, comisiones, envíos, IVA y retenciones. Consultar gráficos, filtrar movimientos y adjuntar facturas PDF/XML o imágenes. |
 | **Compras** | Registrar mercancía en COP o USD, proveedor y alias, guía de seguimiento y costos adicionales. Distribuir gastos entre modelos y recibir pedidos completos. |
 | **Inventario** | Confirmar existencias iniciales, consultar unidades disponibles y en tránsito, y controlar cantidades al vender. Ajustes manuales habilitables desde Configuración. |
 | **Catálogo** | Conservar tus códigos, marcas, subtipos y precios recomendados. Editar y activar o desactivar productos y servicios. |
 | **Gastos** | Registrar gastos pagados o pendientes, categorías personalizadas y documentos. Consultar distribución por categoría y comparar períodos equivalentes. |
 | **Dinero** | Consultar cuentas y movimientos, transferencias y flujo de caja; controlar préstamos y tarjetas separando capital e intereses. |
-| **Informes** | Filtrar y exportar PDF de ventas, gastos, dinero y rentabilidad con valoración FIFO del inventario. |
+| **Informes** | Filtrar y exportar PDF de ventas, compras (base, IVA y otros costos), gastos, dinero, retenciones con seguimiento anual de certificados y rentabilidad con valoración FIFO del inventario. |
 | **Respaldos** | Crear y restaurar copias completas de la base y los documentos adjuntos. |
 
 Las comisiones y los envíos registrados en las ventas se reflejan en Gastos para
 no tener que introducirlos otra vez. Las reglas de costos de compra pueden
 configurarse por subtipo, con excepciones por producto.
+
+## Novedades: 0.6.0-beta.2
+
+Paquetes locales de evaluación con nuevo logo, informes renovados, IVA de compras
+discriminado y seguimiento de certificados de retención con soportes.
+Consulta las [notas de beta 2](docs/releases/0.6.0-beta.2.md).
+Incluye el nuevo Inicio, ingreso rápido, cobros simplificados y avisos de saldo inicial.
 
 ## Instalar la beta
 
@@ -43,12 +50,12 @@ Los paquetes preparados para esta versión son:
 
 | Sistema | Archivo |
 | --- | --- |
-| Debian 13 · Intel/AMD de 64 bits | `Nimbo-0.5.0-beta.1-linux-x86_64.AppImage` |
-| Windows 11 · Intel/AMD de 64 bits | `Nimbo-0.5.0-beta.1-windows-x86_64.zip` |
-| Fuentes y licencias de dependencias | `Nimbo-0.5.0-beta.1-sources.zip` |
+| Debian 13 · Intel/AMD de 64 bits | `Nimbo-0.6.0-beta.2-linux-x86_64.AppImage` |
+| Windows 11 · Intel/AMD de 64 bits | `Nimbo-0.6.0-beta.2-windows-x86_64.zip` |
+| Fuentes y licencias de dependencias | `Nimbo-0.6.0-beta.2-sources.zip` |
 
 Consulta las descargas en [GitHub Releases](https://github.com/fandres/nimbo/releases).
-La primera beta se publica como **versión preliminar**, con sus archivos SHA256.
+La segunda beta se publica como **versión preliminar**, con sus archivos SHA256.
 
 ### Linux
 
@@ -56,14 +63,14 @@ Da permiso de ejecución al AppImage y ábrelo desde el administrador de archivo
 También puedes ejecutarlo desde una terminal:
 
 ```bash
-chmod +x Nimbo-0.5.0-beta.1-linux-x86_64.AppImage
-./Nimbo-0.5.0-beta.1-linux-x86_64.AppImage
+chmod +x Nimbo-0.6.0-beta.2-linux-x86_64.AppImage
+./Nimbo-0.6.0-beta.2-linux-x86_64.AppImage
 ```
 
 Si el sistema no puede montar el AppImage:
 
 ```bash
-./Nimbo-0.5.0-beta.1-linux-x86_64.AppImage --appimage-extract-and-run
+./Nimbo-0.6.0-beta.2-linux-x86_64.AppImage --appimage-extract-and-run
 ```
 
 El paquete se construye en Debian 13. Otras distribuciones Linux necesitan su
@@ -100,7 +107,7 @@ El video de demostración se preparará más adelante.
 
 ## Primeros pasos
 
-1. Configura las cuentas, formas de pago, categorías y costos que utiliza tu negocio.
+1. Configura las cuentas, formas de pago, categorías y costos que utiliza tu negocio. En Dinero → Cuentas, haz doble clic sobre cada cuenta para indicar su saldo inicial (puede ser cero).
 2. Agrega tu catálogo de productos y servicios.
 3. Confirma las existencias actuales desde Inventario. Hasta configurar el control,
    las ventas no descuentan existencias.
@@ -130,7 +137,7 @@ sobre la misma base local.
 
 ## Estado y próximos pasos
 
-Esta beta pasó **468 pruebas automatizadas** en Linux local, Debian 13 aislado y
+Esta beta pasó **541 pruebas automatizadas** en Linux local, Debian 13 aislado y
 Python/Qt de Windows bajo Wine. Los dos paquetes pasaron la prueba de arranque
 con una base temporal. Esto no sustituye las pruebas en equipos reales.
 
@@ -179,7 +186,7 @@ las siguientes versiones.
 
 ## Licencia
 
-Nimbo: [MIT](LICENSE), © 2026 **fandres323**.
+Nimbo: [MIT](LICENSE), © 2026 **fandres**.
 
 Qt, PySide6, Shiboken y las demás dependencias conservan sus licencias propias.
 Los paquetes incluyen los avisos correspondientes y permiten sustituir las

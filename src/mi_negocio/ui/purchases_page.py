@@ -204,6 +204,8 @@ class PurchasesPage(QWidget):
             for row in self.rows:
                 draft=draft_from_record(row);progress=purchase_progress(draft,bool(row['cancelled_at']))
                 state=progress['state'];details=', '.join(categories_for(draft)[key] for key in progress['pending_categories'])
+                unselected=', '.join(categories_for(draft)[key] for key in progress['unselected_categories'])
+                if unselected:details+=(' · ' if details else '')+'Sin seleccionar: '+unselected
                 if state=='costs_pending' and progress['legacy']:details='Revisar conceptos pendientes'
                 purchased=date.fromisoformat(row['purchased_on'])
                 supplier_name=row['supplier']+(' · '+row['supplier_alias'] if row.get('supplier_alias') else '')
@@ -223,7 +225,7 @@ class PurchasesPage(QWidget):
                 heading_widget.setToolTip(parent.toolTip(0));self.table.setItemWidget(parent,0,heading_widget)
                 statuses=QWidget();status_box=QVBoxLayout(statuses);status_box.setContentsMargins(6,8,6,8);status_box.setSpacing(5);status_box.setAlignment(Qt.AlignVCenter)
                 bg,fg=('#edf0f5','#68758c') if state=='cancelled' else ('#def5e7','#137844') if state=='complete' else ('#fff1d1','#925400')
-                badge=self._badge(labels[state],bg,fg);badge.setToolTip(details or labels[state]);status_box.addWidget(badge)
+                badge=self._badge('Costos por revisar' if state=='costs_pending' and progress['unselected_categories'] and not progress['pending_categories'] else labels[state],bg,fg);badge.setToolTip(details or labels[state]);status_box.addWidget(badge)
                 if not row['cancelled_at']:
                     badge=self._badge('Recibido' if row['receipt'] else 'Pendiente de recepción','#def5e7' if row['receipt'] else '#e3eaff','#137844' if row['receipt'] else '#284bb5')
                     if row['receipt']:badge.setToolTip('Recibido el '+row['receipt']['received_on'])

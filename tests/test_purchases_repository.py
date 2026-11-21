@@ -90,7 +90,7 @@ def test_v8_migration_backup_and_reopen(tmp_path):
     cat.connection.execute('PRAGMA user_version=8')
     cat.connection.commit(); cat.close()
     cat = CatalogRepository(path)
-    assert cat.connection.execute('PRAGMA user_version').fetchone()[0] ==25
+    assert cat.connection.execute('PRAGMA user_version').fetchone()[0] ==29
     assert cat.connection.execute('SELECT name FROM accounts WHERE id=2').fetchone()[0] == 'Mi banco'
     cat.close()
     backups = list(tmp_path.glob('*.backup-*'))

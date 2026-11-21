@@ -122,7 +122,7 @@ def test_existing_order_can_add_new_concepts_without_rewriting_history(qtbot,tmp
     assert iva['key'] not in dialog.categories
     dialog.update_concepts()
     assert dialog.categories[iva['key']]=='IVA' and dialog.categories['taxes']=='Impuestos'
-    assert dialog.progress_editor.states()[iva['key']]=='pending'
+    assert dialog.progress_editor.states()[iva['key']]=='unselected'
     assert dialog.progress_editor.states()['taxes']=='not_applicable'
     assert iva['key'] not in repo.get(saved['id'])['cost_definitions']
     dialog.load()
@@ -145,7 +145,7 @@ def test_refresh_concepts_in_open_draft_preserves_unsaved_costs(qtbot,tmp_path):
     d.lines=[PurchaseLineInput(product.id,1,10000)];d.refresh_lines()
     cost=PurchaseCostInput('taxes','',1900)
     d.cost_editor.set_costs((cost,))
-    d.progress_editor.editors['taxes'].setCurrentIndex(1)
+    d.progress_editor.editors['taxes'].setCurrentIndex(d.progress_editor.editors['taxes'].findData('recorded'))
     cfg=PurchaseConceptsRepository(cat.connection);iva=cfg.save('IVA','other')
     disabled=cfg.save('No disponible','other',enabled=False)
     d.update_concepts()

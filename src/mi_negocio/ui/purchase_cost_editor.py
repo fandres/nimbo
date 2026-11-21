@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, Signal, QDate
 from PySide6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QComboBox, QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView)
 from .form_validation import check, required, amount_issue, choice
-from ..purchases import CATEGORIES, PurchaseCostInput, validate_rate, convert_to_cop
+from ..purchases import CATEGORIES, COST_STATES, PurchaseCostInput, validate_rate, convert_to_cop
 from ..catalog import ValidationError
 from ..sales import money
 from .sales_widgets import AmountEdit, cents_text, date_edit, note, error_text
@@ -146,12 +146,12 @@ class PurchaseCostEditor(QWidget):
     def sync_states(self):
         if self.progress is None: return
         states=self.progress.states()
-        colors={'pending':'#fff1de','recorded':'#e9f6ee','not_applicable':'#edf0f5'}
+        colors={'unselected':'#ffffff','pending':'#fff1de','recorded':'#e9f6ee','not_applicable':'#edf0f5'}
         for key,combo in self.state_combos.items():
             combo.blockSignals(True)
             combo.setEnabled(True)
             combo.setToolTip("Selecciona el estado; se activará el seguimiento por concepto." if states is None else "")
-            combo.setCurrentIndex(combo.findData(states[key] if states else 'pending'))
+            combo.setCurrentIndex(combo.findData(states[key] if states else 'unselected'))
             combo.setStyleSheet('QComboBox { background: '+colors[combo.currentData()]+'; padding: 4px; }')
             combo.blockSignals(False)
 
@@ -166,7 +166,7 @@ class PurchaseCostEditor(QWidget):
                 item=QTableWidgetItem(value.replace(' / ',' /\n') if col==0 else value); item.setToolTip(value); self.table.setItem(row,col,item)
             if with_state:
                 combo=QComboBox()
-                for label,value in [('Pendiente','pending'),('Registrado','recorded'),('No aplica','not_applicable')]: combo.addItem(label,value)
+                for label,value in COST_STATES: combo.addItem(label,value)
                 combo.setAccessibleName('Estado de '+self.categories[key])
                 self.state_combos[key]=combo; self.table.setCellWidget(row,3,combo)
                 def changed(*args):
@@ -212,7 +212,21 @@ class PurchaseCostEditor(QWidget):
     def remove_selected(self):
         row=self.table.currentRow()
         if 0<=row<len(self.row_costs) and self.row_costs[row] is not None:
-            self._costs.pop(self.row_costs[row]); self.refresh()
+            removed=self._costs.pop(self.row_costs[row])
+            self._clear_empty_registered(removed.category)
+            self.refresh()
+
+    def _clear_empty_registered(self, category):
+        if not self.progress or any(cost.category==category for cost in self._costs):return
+        target=self.progress.editors[category]
+        if self.progress.states() is not None and target.currentData()=='recorded':
+            target.setCurrentIndex(target.findData('unselected'))
+
+    def _record_cost(self, category):
+        if not self.progress:return
+        if self.progress.states() is None:self.progress.activate.setChecked(True)
+        target=self.progress.editors[category]
+        target.setCurrentIndex(target.findData('recorded'))
 
     def open_editor(self,index=None):
         if self.dialog and self.dialog.isVisible(): self.dialog.raise_(); return
@@ -226,7 +240,10 @@ class PurchaseCostEditor(QWidget):
             dialog.error.setText('IVA ya calculado en productos. No puedes agregarlo también como costo de factura.')
         dialog.validate_candidate=lambda cost: self.validate_candidate(cost,index) if self.validate_candidate else None
         def applied():
+            previous=self._costs[index].category if index is not None else None
             if index is None: self._costs.append(dialog.result_cost)
             else: self._costs[index]=dialog.result_cost
+            if previous:self._clear_empty_registered(previous)
+            self._record_cost(dialog.result_cost.category)
             self.refresh()
         dialog.accepted.connect(applied); dialog.show()

@@ -12,6 +12,7 @@ from ..storage import StorageError
 from ..catalog import ValidationError
 from .sales_widgets import note,amount,date_edit,account_combo,error_text,shipping_method_combo,cents_text
 from .sale_summary import SaleSummary
+from .receipt_dialog import PaymentMethodCombo,estimated_commission
 from .style import STYLE,format_cop
 
 
@@ -66,7 +67,8 @@ class SaleDetailDialog(QDialog):
         self.withholding.toggled.connect(self._update_retention_requirement);self._update_retention_requirement()
         invoice.addStretch()
         receipt=section('2 · Cobro de la venta')
-        receipt.addWidget(note(self.sale['method_name']+(' · '+self.sale['provider'] if self.sale['provider'] else ''),'fieldHeading'))
+        self.payment_method=PaymentMethodCombo(settings,self.sale)
+        receipt.addWidget(note('Forma de pago','fieldHeading'));receipt.addWidget(self.payment_method)
         self.received=QCheckBox('Ya recibí el dinero');receipt.addWidget(self.received)
         self.receipt_status=note('');receipt.addWidget(self.receipt_status)
         self.receipt_date=date_edit();self.account=account_combo(settings,self.sale['destination_account_id']);self.commission=amount(self.sale['commission_cents'])
@@ -100,7 +102,14 @@ class SaleDetailDialog(QDialog):
         self.received.toggled.connect(self.update_state);self.shipping_paid.toggled.connect(self.update_state)
         self.withholding.toggled.connect(self.update_summary);self.commission.textChanged.connect(self.update_summary)
         self.shipping_account.currentIndexChanged.connect(self.update_state)
+        self.payment_method.currentIndexChanged.connect(self.payment_method_changed)
         self.load_saved_state();self.arrange_sections()
+
+    def payment_method_changed(self):
+        try:
+            self.commission.setText(cents_text(self.preview_sale()['commission_cents']))
+            self.error.hide();self.update_summary()
+        except ValidationError as exc:self.error.setText(error_text(exc));self.error.show()
 
     @staticmethod
     def select_account(combo,key,name):
@@ -111,6 +120,7 @@ class SaleDetailDialog(QDialog):
 
     def load_saved_state(self):
         r=self.sale['receipt'];p=self.sale['shipping_payment']
+        self.payment_method.setEnabled(not r and not self.sale['cancelled_at'] and self.sales.permissions()['edit'])
         self.received.setChecked(bool(r));self.received.setEnabled(not r)
         if r:
             self.receipt_date.setDate(QDate.fromString(r['received_on'],'yyyy-MM-dd'))
@@ -169,8 +179,11 @@ class SaleDetailDialog(QDialog):
             entries.append(row['created_at']+'\nAntes: '+format_cop(before['total_cents'])+' → Después: '+format_cop(after['total_cents']))
             for title,data in [('Antes',before),('Después',after)]:
                 entries.append(title+': '+ '; '.join(f"{l['quantity']} × {l['code']} · {l['name']} ({format_cop(l['unit_price_cents'])}/u)" for l in data['lines']))
-            for key,label in [('invoice_ref','Factura'),('customer_email','Correo'),('customer_alias','Alias'),('customer_phone','Celular'),('has_withholding','Retención'),('tracking_number','Guía')]:
+            for key,label in [('invoice_ref','Factura'),('method_name','Forma de pago'),('customer_email','Correo'),('customer_alias','Alias'),('customer_phone','Celular'),('has_withholding','Retención'),('tracking_number','Guía')]:
                 if before[key]!=after[key]:entries.append(f"{label}: {before[key]} → {after[key]}")
+            if before.get('receipt')!=after.get('receipt') and after.get('receipt'):
+                paid=after['receipt']
+                entries.append(f"Cobro: {paid['received_on']} · {paid['account_name']} · Comisión: {format_cop(paid['commission_cents'])}")
         if self.sale['cancelled_at']:entries.append('Anulada: '+self.sale['cancelled_at']+' · '+(self.sale['cancellation_reason'] or 'Sin motivo'))
         text.setPlainText('\n'.join(entries) or 'Sin cambios registrados.')
         close=QPushButton('Cerrar');root.addWidget(close);close.clicked.connect(dialog.accept);dialog.exec()
@@ -182,6 +195,8 @@ class SaleDetailDialog(QDialog):
                 Decimal(self.sale['rate_percent']),self.sale['fixed_cents'],vat_enabled=bool(self.sale['vat_enabled']),
                 vat_rate=Decimal(self.sale['vat_rate']),vat_included=bool(self.sale['vat_included']))
             for field in ('subtotal_cents','total_cents','commission_cents','base_cents','vat_cents'):result[field]=getattr(totals,field)
+        method=self.payment_method.changed_method()
+        if method:result['commission_cents']=estimated_commission(method,result['total_cents'])
         return result
 
     def cancel_sale(self):
@@ -246,7 +261,7 @@ class SaleDetailDialog(QDialog):
             details=None;p=self.sale['shipping_payment']
             if p and (self.shipping_account.currentData(),self.shipping_method.currentData())!=(p['account_id'],p['payment_kind']):
                 details=(self.shipping_account.currentData(),self.shipping_method.currentData())
-            self.sale=self.sales.save_detail(self.sale_id,invoice_ref=self.invoice.text(),has_withholding=self.withholding.isChecked(),tracking_number=self.tracking.text(),customer_email=self.customer_email.text(),customer_alias=self.customer_alias.text(),customer_phone=self.customer_phone.text(),receipt=receipt,shipping_payment=shipping,shipping_details=details,lines=self.pending_lines)
+            self.sale=self.sales.save_detail(self.sale_id,invoice_ref=self.invoice.text(),has_withholding=self.withholding.isChecked(),tracking_number=self.tracking.text(),customer_email=self.customer_email.text(),customer_alias=self.customer_alias.text(),customer_phone=self.customer_phone.text(),receipt=receipt,shipping_payment=shipping,shipping_details=details,lines=self.pending_lines,payment_method=self.payment_method.changed_method(),expected_sale=self.sale)
             self.pending_lines=None
             self.error.hide();self.load_saved_state();self.saved.emit(self.sale_id);self.accept()
         except (StorageError,ValidationError) as e:
